@@ -54,6 +54,11 @@ export interface BiSemanticPayload {
   [key: string]: unknown
 }
 
+export interface BiLlmState {
+  enabled: boolean
+  providers: Record<string, boolean>
+}
+
 export interface BiPhaseResponse {
   status: string
   run_id: string
@@ -61,6 +66,7 @@ export interface BiPhaseResponse {
   semantic: BiSemanticPayload
   marts: BiMartPreview[]
   llm_enabled: boolean
+  llm: BiLlmState
 }
 
 class MindQAPI {

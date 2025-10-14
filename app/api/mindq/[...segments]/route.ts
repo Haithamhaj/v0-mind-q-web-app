@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export const runtime = "nodejs"
 
-const DEFAULT_BACKEND_BASE = "http://localhost:9000"
+const DEFAULT_BACKEND_BASE = "http://localhost:8000"
 
 const getBackendBase = () => {
   const configured = process.env.MINDQ_API_BASE_URL?.trim()

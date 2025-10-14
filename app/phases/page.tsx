@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
 import type { BiPhaseResponse, PhaseRequest } from "@/lib/api"
-import type { PhaseRequest } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 const phases = [
@@ -51,6 +50,9 @@ export default function PhasesPage() {
     selectedPhase === "10" && phaseResult && typeof phaseResult === "object" && "marts" in phaseResult
       ? (phaseResult as BiPhaseResponse)
       : null
+  const biLlm = biResult
+    ? biResult.llm ?? { enabled: Boolean(biResult.llm_enabled), providers: {} as Record<string, boolean> }
+    : null
 
   const addDataFile = () => {
     dataFileInputRef.current?.click()
@@ -506,6 +508,28 @@ export default function PhasesPage() {
                                   ) : null}
                                 </div>
                               ) : null}
+                              {biLlm ? (
+                                <div className="rounded-md border border-border bg-card/60 p-3 text-xs text-muted-foreground">
+                                  <p className="mb-2 font-semibold text-foreground">LLM providers</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Assistance is {biLlm.enabled ? "enabled" : "disabled"} for this run.
+                                  </p>
+                                  <ul className="mt-1 flex flex-wrap gap-2">
+                                    {Object.entries(biLlm.providers).map(([provider, active]) => (
+                                      <li
+                                        key={provider}
+                                        className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                          active
+                                            ? "bg-secondary/30 text-secondary-foreground"
+                                            : "bg-muted text-muted-foreground"
+                                        }`}
+                                      >
+                                        {provider.toUpperCase()}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground">
@@ -630,3 +654,5 @@ export default function PhasesPage() {
     </div>
   )
 }
+
+
