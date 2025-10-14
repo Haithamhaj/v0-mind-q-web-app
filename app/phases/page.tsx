@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,8 +28,10 @@ const phases = [
 ]
 
 export default function PhasesPage() {
+  const generateRunId = () => `phase-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`
+  const initialRunId = useMemo(() => generateRunId(), [])
   const [selectedPhase, setSelectedPhase] = useState("01")
-  const [runId, setRunId] = useState("")
+  const [runId, setRunId] = useState(initialRunId)
   const [dataFiles, setDataFiles] = useState<string[]>([])
   const [slaFiles, setSlaFiles] = useState<string[]>([])
   const [configJson, setConfigJson] = useState("")
@@ -151,14 +153,9 @@ export default function PhasesPage() {
     console.log("[v0] handleRunPhase called for phase:", selectedPhase)
     console.log("[v0] Current state - runId:", runId, "dataFiles:", dataFiles, "slaFiles:", slaFiles)
 
-    if (!runId) {
-      console.log("[v0] Validation failed - missing runId")
-      toast({
-        title: "Validation Error",
-        description: "Please provide a Run ID",
-        variant: "destructive",
-      })
-      return
+    const trimmedRunId = runId.trim() || generateRunId()
+    if (!runId.trim()) {
+      setRunId(trimmedRunId)
     }
 
     setIsRunning(true)
@@ -200,7 +197,7 @@ export default function PhasesPage() {
         }
 
         console.log("[v0] Executing Phase 01 with ingestion request")
-        response = await api.runPhase01(runId, {
+        response = await api.runPhase01(trimmedRunId, {
           data_files: dataFiles.filter((f) => f.trim()),
           sla_files: slaFiles.filter((f) => f.trim()),
           config,
@@ -208,7 +205,7 @@ export default function PhasesPage() {
       } else {
         // Other phases use standard request
         console.log("[v0] Executing Phase", selectedPhase, "with standard request")
-        response = await api.runPhase(runId, selectedPhase, {
+        response = await api.runPhase(trimmedRunId, selectedPhase, {
           config,
           use_defaults: true,
         })
@@ -219,7 +216,7 @@ export default function PhasesPage() {
       console.log("[v0] Phase execution successful:", response)
       toast({
         title: "Phase Started",
-        description: `Phase ${selectedPhase} is now running for ${runId}`,
+        description: `Phase ${selectedPhase} is now running for ${trimmedRunId}`,
       })
     } catch (error) {
       console.error("[v0] Phase execution failed:", error)
@@ -324,12 +321,28 @@ export default function PhasesPage() {
                       {/* Run ID */}
                       <div className="space-y-2">
                         <Label htmlFor="runId">Run ID</Label>
-                        <Input
-                          id="runId"
-                          placeholder="e.g., run_2024_001"
-                          value={runId}
-                          onChange={(e) => setRunId(e.target.value)}
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="runId"
+                            placeholder="Phase run identifier"
+                            value={runId}
+                            onChange={(e) => setRunId(e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              const newId = generateRunId()
+                              setRunId(newId)
+                              toast({
+                                title: "Run ID updated",
+                                description: `Generated ${newId}`,
+                              })
+                            }}
+                          >
+                            Regenerate
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Phase 01 specific fields */}

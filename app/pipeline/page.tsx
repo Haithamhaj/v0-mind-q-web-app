@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useMemo } from "react"
 import type { PipelineResponse } from "@/lib/api"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
@@ -15,8 +15,11 @@ import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
+const generateRunId = () => `run-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`
+
 export default function PipelinePage() {
-  const [runId, setRunId] = useState("")
+  const initialRunId = useMemo(() => generateRunId(), [])
+  const [runId, setRunId] = useState(initialRunId)
   const [dataFiles, setDataFiles] = useState<string[]>([])
   const [slaFiles, setSlaFiles] = useState<string[]>([])
   const [stopOnError, setStopOnError] = useState(true)
@@ -139,11 +142,16 @@ export default function PipelinePage() {
     console.log("[v0] handleRunPipeline called")
     console.log("[v0] Current state - runId:", runId, "dataFiles:", dataFiles, "slaFiles:", slaFiles)
 
-    if (!runId || dataFiles.filter((f) => f.trim()).length === 0) {
-      console.log("[v0] Validation failed - missing runId or dataFiles")
+    const trimmedRunId = runId.trim() || generateRunId()
+    if (!runId.trim()) {
+      setRunId(trimmedRunId)
+    }
+
+    if (dataFiles.filter((f) => f.trim()).length === 0) {
+      console.log("[v0] Validation failed - missing dataFiles")
       toast({
         title: "Validation Error",
-        description: "Please provide a Run ID and at least one data file",
+        description: "Please upload or enter at least one data file path",
         variant: "destructive",
       })
       return
@@ -155,7 +163,7 @@ export default function PipelinePage() {
     console.log("[v0] Starting pipeline execution...")
 
     try {
-      const result = await api.runFullPipeline(runId, {
+      const result = await api.runFullPipeline(trimmedRunId, {
         data_files: dataFiles.filter((f) => f.trim()),
         sla_files: slaFiles.filter((f) => f.trim()),
         stop_on_error: stopOnError,
@@ -221,13 +229,29 @@ export default function PipelinePage() {
               <CardContent className="space-y-6">
                 {/* Run ID */}
                 <div className="space-y-2">
-                  <Label htmlFor="runId">Run ID</Label>
-                  <Input
-                    id="runId"
-                    placeholder="e.g., run_2024_001"
-                    value={runId}
-                    onChange={(e) => setRunId(e.target.value)}
-                  />
+                    <Label htmlFor="runId">Run ID</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="runId"
+                        placeholder="Run identifier"
+                        value={runId}
+                        onChange={(e) => setRunId(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          const newId = generateRunId()
+                          setRunId(newId)
+                          toast({
+                            title: "Run ID updated",
+                            description: `Generated ${newId}`,
+                          })
+                        }}
+                      >
+                        Regenerate
+                      </Button>
+                    </div>
                   <p className="text-xs text-muted-foreground">Unique identifier for this pipeline run</p>
                 </div>
 
