@@ -420,7 +420,7 @@ export default function PipelinePage() {
             <Card>
               <CardHeader>
                 <CardTitle>Pipeline Stages</CardTitle>
-                <CardDescription>9 stages from ingestion to business validation</CardDescription>
+                <CardDescription>10 stages from ingestion to BI delivery</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-3">
@@ -434,6 +434,7 @@ export default function PipelinePage() {
                     { stage: "07", name: "Readiness", desc: "Readiness analysis" },
                     { stage: "08", name: "Insights", desc: "Operational insights" },
                     { stage: "09", name: "Validation", desc: "Business validation" },
+                    { stage: "10", name: "BI Delivery", desc: "Semantic marts & dashboards" },
                   ].map((phase) => (
                     <div
                       key={phase.stage}

@@ -38,6 +38,31 @@ export interface PipelineResponse {
   phases: Array<Record<string, unknown>>
 }
 
+export interface BiMartPreview {
+  mart?: string
+  view?: string
+  file?: string
+  row_count?: number | null
+  preview?: Array<Record<string, unknown>>
+}
+
+export interface BiSemanticPayload {
+  timezone?: string
+  currency?: string
+  marts?: Array<Record<string, unknown>>
+  metrics?: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
+
+export interface BiPhaseResponse {
+  status: string
+  run_id: string
+  artifacts_root: string
+  semantic: BiSemanticPayload
+  marts: BiMartPreview[]
+  llm_enabled: boolean
+}
+
 class MindQAPI {
   private baseURL: string
 
@@ -160,6 +185,7 @@ class MindQAPI {
       "07": "readiness",
       "08": "insights",
       "09": "business-validation",
+      "10": "bi",
     }
 
     const endpoint = phaseMap[phase]
@@ -168,6 +194,10 @@ class MindQAPI {
     }
 
     return this.post(`/v1/runs/${runId}/phases/${phase}/${endpoint}`, request)
+  }
+
+  async runPhase10(runId: string, request: PhaseRequest = {}): Promise<BiPhaseResponse> {
+    return this.post(`/v1/runs/${runId}/phases/10/bi`, request)
   }
 
   async runFeatureReport(runId: string, request: PhaseRequest): Promise<Record<string, unknown>> {

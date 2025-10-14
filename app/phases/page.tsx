@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
+import type { BiPhaseResponse, PhaseRequest } from "@/lib/api"
+import type { PhaseRequest } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 const phases = [
@@ -25,6 +27,7 @@ const phases = [
   { id: "07", name: "Readiness", desc: "Leakage detection and correlation analysis" },
   { id: "08", name: "Insights", desc: "Associative insights and operational stories" },
   { id: "09", name: "Validation", desc: "Business validation and SLA assessment" },
+  { id: "10", name: "BI Delivery", desc: "Stage 10 marts, semantic catalog, and dashboards" },
 ]
 
 export default function PhasesPage() {
@@ -44,6 +47,10 @@ export default function PhasesPage() {
 
   const dataFileInputRef = useRef<HTMLInputElement>(null)
   const slaFileInputRef = useRef<HTMLInputElement>(null)
+  const biResult =
+    selectedPhase === "10" && phaseResult && typeof phaseResult === "object" && "marts" in phaseResult
+      ? (phaseResult as BiPhaseResponse)
+      : null
 
   const addDataFile = () => {
     dataFileInputRef.current?.click()
@@ -202,6 +209,15 @@ export default function PhasesPage() {
           sla_files: slaFiles.filter((f) => f.trim()),
           config,
         })
+      } else if (selectedPhase === "10") {
+        console.log("[v0] Executing Phase 10 with BI request")
+        const payload: PhaseRequest = {
+          use_defaults: false,
+        }
+        if (config) {
+          payload.config = config
+        }
+        response = await api.runPhase10(trimmedRunId, payload)
       } else {
         // Other phases use standard request
         console.log("[v0] Executing Phase", selectedPhase, "with standard request")
@@ -449,8 +465,63 @@ export default function PhasesPage() {
                           </>
                         )}
 
+                      {selectedPhase === "10" && (
+                        <div className="space-y-3 rounded-lg border border-secondary/30 bg-secondary/10 p-4">
+                          <div className="space-y-1">
+                            <h3 className="text-sm font-semibold text-foreground">Stage 10 BI validation</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Confirms semantic definitions and marts under{" "}
+                              <code>artifacts/{runId}/stage_10_bi/</code>. Run this after Stage 09 to surface BI-ready
+                              datasets and dashboards.
+                            </p>
+                          </div>
+                          {biResult ? (
+                            <div className="space-y-2 text-sm text-foreground">
+                              <p>
+                                Semantic metrics loaded:{" "}
+                                <span className="font-semibold">
+                                  {Array.isArray(biResult.semantic?.metrics)
+                                    ? biResult.semantic.metrics.length
+                                    : 0}
+                                </span>
+                              </p>
+                              <p>
+                                Available marts: <span className="font-semibold">{biResult.marts.length}</span>
+                              </p>
+                              {biResult.marts.length > 0 ? (
+                                <div className="rounded-md border border-border bg-card/60 p-3 text-xs text-muted-foreground">
+                                  <p className="mb-2 font-semibold text-foreground">Sample datasets</p>
+                                  <ul className="space-y-1">
+                                    {biResult.marts.slice(0, 3).map((mart, index) => (
+                                      <li key={`${mart.mart}-${mart.view}-${index}`}>
+                                        <span className="font-medium text-foreground">{mart.view}</span>
+                                        {typeof mart.row_count === "number" ? ` · ${mart.row_count} rows` : ""}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  {biResult.marts.length > 3 ? (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                      Showing first 3 tables. Review the full payload below for complete previews.
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Ensure <code>marts/*.parquet</code> and <code>semantic/metrics.yaml</code> exist, then run
+                              this phase to validate readiness and fetch dataset previews.
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Override timezone, currency, or LLM usage via the Advanced JSON config. Example:{" "}
+                            <code>{"{\"timezone\":\"Asia/Riyadh\",\"currency\":\"SAR\",\"llm_enabled\":false}"}</code>
+                          </p>
+                        </div>
+                      )}
+
                       {/* Other phases info */}
-                      {selectedPhase !== "01" && (
+                      {selectedPhase !== "01" && selectedPhase !== "10" && (
                         <div className="rounded-lg border border-border bg-muted/20 p-4">
                           <p className="text-sm text-muted-foreground">
                             This phase will use default inputs from previous stages. You can override specific inputs in
@@ -547,8 +618,8 @@ export default function PhasesPage() {
                     ))}
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Each phase depends on outputs from previous stages. Phase 01 is the entry point and requires raw
-                    data files.
+                    Each phase depends on outputs from previous stages. Phase 01 is the entry point and requires raw data
+                    files, while Phase 10 expects the curated marts and semantic catalog produced after Phase 09.
                   </p>
                 </div>
               </CardContent>
