@@ -17,13 +17,15 @@ import { useToast } from "@/hooks/use-toast"
 
 export default function PipelinePage() {
   const [runId, setRunId] = useState("")
-  const [dataFiles, setDataFiles] = useState<string[]>([""])
+  const [dataFiles, setDataFiles] = useState<string[]>([])
   const [slaFiles, setSlaFiles] = useState<string[]>([])
   const [stopOnError, setStopOnError] = useState(true)
   const [llmSummary, setLlmSummary] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [pipelineResult, setPipelineResult] = useState<PipelineResponse | null>(null)
   const [pipelineError, setPipelineError] = useState<string | null>(null)
+  const [isUploadingDataFiles, setIsUploadingDataFiles] = useState(false)
+  const [isUploadingSlaFiles, setIsUploadingSlaFiles] = useState(false)
   const { toast } = useToast()
 
   const dataFileInputRef = useRef<HTMLInputElement>(null)
@@ -33,46 +35,104 @@ export default function PipelinePage() {
     dataFileInputRef.current?.click()
   }
 
-  const handleDataFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const addManualDataFile = () => {
+    setDataFiles((prev) => [...prev, ""])
+  }
+
+  const handleDataFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files && files.length > 0) {
-      const newFiles = Array.from(files).map((file) => file.name)
-      setDataFiles([...dataFiles.filter((f) => f.trim()), ...newFiles])
+    if (!files || files.length === 0) {
+      return
     }
-    // Reset input
-    if (dataFileInputRef.current) {
-      dataFileInputRef.current.value = ""
+
+    const selectedFiles = Array.from(files)
+    setIsUploadingDataFiles(true)
+
+    try {
+      const uploads = await Promise.all(selectedFiles.map((file) => api.uploadFile(file)))
+      setDataFiles((prev) => {
+        const existing = [...prev]
+        const newPaths = uploads.map((upload) => upload.path)
+        return [...existing, ...newPaths]
+      })
+      toast({
+        title: "Data ready",
+        description: `Uploaded ${uploads.length} data file${uploads.length > 1 ? "s" : ""} for processing`,
+      })
+    } catch (error) {
+      console.error("[v0] Data file upload failed:", error)
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload data files",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingDataFiles(false)
+      if (dataFileInputRef.current) {
+        dataFileInputRef.current.value = ""
+      }
     }
   }
 
-  const removeDataFile = (index: number) => setDataFiles(dataFiles.filter((_, i) => i !== index))
+  const removeDataFile = (index: number) => setDataFiles((prev) => prev.filter((_, i) => i !== index))
   const updateDataFile = (index: number, value: string) => {
-    const newFiles = [...dataFiles]
-    newFiles[index] = value
-    setDataFiles(newFiles)
+    setDataFiles((prev) => {
+      const newFiles = [...prev]
+      newFiles[index] = value
+      return newFiles
+    })
   }
 
   const addSlaFile = () => {
     slaFileInputRef.current?.click()
   }
 
-  const handleSlaFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const addManualSlaFile = () => {
+    setSlaFiles((prev) => [...prev, ""])
+  }
+
+  const handleSlaFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files && files.length > 0) {
-      const newFiles = Array.from(files).map((file) => file.name)
-      setSlaFiles([...slaFiles, ...newFiles])
+    if (!files || files.length === 0) {
+      return
     }
-    // Reset input
-    if (slaFileInputRef.current) {
-      slaFileInputRef.current.value = ""
+
+    const selectedFiles = Array.from(files)
+    setIsUploadingSlaFiles(true)
+
+    try {
+      const uploads = await Promise.all(selectedFiles.map((file) => api.uploadFile(file)))
+      setSlaFiles((prev) => {
+        const existing = [...prev]
+        const newPaths = uploads.map((upload) => upload.path)
+        return [...existing, ...newPaths]
+      })
+      toast({
+        title: "SLA files ready",
+        description: `Uploaded ${uploads.length} SLA document${uploads.length > 1 ? "s" : ""}`,
+      })
+    } catch (error) {
+      console.error("[v0] SLA file upload failed:", error)
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload SLA files",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingSlaFiles(false)
+      if (slaFileInputRef.current) {
+        slaFileInputRef.current.value = ""
+      }
     }
   }
 
-  const removeSlaFile = (index: number) => setSlaFiles(slaFiles.filter((_, i) => i !== index))
+  const removeSlaFile = (index: number) => setSlaFiles((prev) => prev.filter((_, i) => i !== index))
   const updateSlaFile = (index: number, value: string) => {
-    const newFiles = [...slaFiles]
-    newFiles[index] = value
-    setSlaFiles(newFiles)
+    setSlaFiles((prev) => {
+      const newFiles = [...prev]
+      newFiles[index] = value
+      return newFiles
+    })
   }
 
   const handleRunPipeline = async () => {
@@ -172,48 +232,77 @@ export default function PipelinePage() {
                 </div>
 
                 {/* Data Files */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Data Files</Label>
-                    <Button variant="outline" size="sm" onClick={addDataFile}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add File
-                    </Button>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <Label>Data Files</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Upload raw datasets or enter server-accessible paths.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={addDataFile} disabled={isUploadingDataFiles}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Upload Files
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={addManualDataFile}>
+                        Add Path
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {dataFiles.map((file, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Input
-                          placeholder="/path/to/data.csv or /path/to/data.parquet"
-                          value={file}
-                          onChange={(e) => updateDataFile(index, e.target.value)}
-                        />
-                        {dataFiles.length > 1 && (
+                  {isUploadingDataFiles ? (
+                    <p className="text-xs text-muted-foreground">Uploading data files...</p>
+                  ) : null}
+                  {dataFiles.length > 0 ? (
+                    <div className="space-y-2">
+                      {dataFiles.map((file, index) => (
+                        <div key={`${file}-${index}`} className="flex gap-2">
+                          <Input
+                            placeholder="/absolute/path/to/data.csv"
+                            value={file}
+                            onChange={(e) => updateDataFile(index, e.target.value)}
+                          />
                           <Button variant="ghost" size="icon" onClick={() => removeDataFile(index)}>
                             <X className="h-4 w-4" />
                           </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">CSV or Parquet files for ingestion</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground">No data files selected yet.</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Uploaded files are stored under <code>uploads/</code> and their absolute paths are sent to the
+                    pipeline. Adjust paths if the backend expects a different location.
+                  </p>
                 </div>
 
                 {/* SLA Files */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>SLA Files (Optional)</Label>
-                    <Button variant="outline" size="sm" onClick={addSlaFile}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add SLA
-                    </Button>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <Label>SLA Files (Optional)</Label>
+                      <p className="text-xs text-muted-foreground">Attach SLA documents or reference existing paths.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={addSlaFile} disabled={isUploadingSlaFiles}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Upload SLA
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={addManualSlaFile}>
+                        Add Path
+                      </Button>
+                    </div>
                   </div>
-                  {slaFiles.length > 0 && (
+                  {isUploadingSlaFiles ? (
+                    <p className="text-xs text-muted-foreground">Uploading SLA documents...</p>
+                  ) : null}
+                  {slaFiles.length > 0 ? (
                     <div className="space-y-2">
                       {slaFiles.map((file, index) => (
-                        <div key={index} className="flex gap-2">
+                        <div key={`${file}-${index}`} className="flex gap-2">
                           <Input
-                            placeholder="/path/to/sla.pdf or /path/to/sla.docx"
+                            placeholder="/absolute/path/to/sla.pdf"
                             value={file}
                             onChange={(e) => updateSlaFile(index, e.target.value)}
                           />
@@ -223,8 +312,12 @@ export default function PipelinePage() {
                         </div>
                       ))}
                     </div>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground">No SLA documents attached.</p>
                   )}
-                  <p className="text-xs text-muted-foreground">PDF, DOCX, CSV, HTML, or Excel SLA documents</p>
+                  <p className="text-xs text-muted-foreground">
+                    Supported formats: PDF, DOCX, CSV, HTML, Excel. Uploaded files are stored under <code>uploads/</code>.
+                  </p>
                 </div>
 
                 {/* Options */}
@@ -247,9 +340,18 @@ export default function PipelinePage() {
                 </div>
 
                 {/* Run Button */}
-                <Button className="w-full" size="lg" onClick={handleRunPipeline} disabled={isRunning}>
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={handleRunPipeline}
+                  disabled={isRunning || isUploadingDataFiles || isUploadingSlaFiles}
+                >
                   <Play className="mr-2 h-5 w-5" />
-                  {isRunning ? "Running Pipeline..." : "Run Full Pipeline"}
+                  {isUploadingDataFiles || isUploadingSlaFiles
+                    ? "Uploading files..."
+                    : isRunning
+                      ? "Running Pipeline..."
+                      : "Run Full Pipeline"}
                 </Button>
               </CardContent>
             </Card>

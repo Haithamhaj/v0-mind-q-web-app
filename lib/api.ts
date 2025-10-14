@@ -1,7 +1,14 @@
-const DEFAULT_API_BASE_URL = "http://localhost:9000"
+const CLIENT_DEFAULT_API_BASE_URL = "/api/mindq"
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "").replace(/\/$/, "") ||
-  DEFAULT_API_BASE_URL
+  CLIENT_DEFAULT_API_BASE_URL
+
+export interface UploadResponse {
+  originalName: string
+  storedFileName: string
+  path: string
+  size: number
+}
 
 export interface PhaseRequest {
   inputs?: Record<string, unknown>
@@ -35,11 +42,15 @@ class MindQAPI {
   private baseURL: string
 
   constructor(baseURL: string = API_BASE_URL) {
-    this.baseURL = baseURL || DEFAULT_API_BASE_URL
+    this.baseURL = baseURL || CLIENT_DEFAULT_API_BASE_URL
   }
 
   private buildURL(path: string) {
-    return `${this.baseURL.replace(/\/$/, "")}${path}`
+    const normalizedBase = this.baseURL.replace(/\/$/, "")
+    if (path.startsWith("/")) {
+      return `${normalizedBase}${path}`
+    }
+    return `${normalizedBase}/${path}`
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -121,6 +132,18 @@ class MindQAPI {
 
   async healthCheck(): Promise<Record<string, unknown>> {
     return this.get("/healthz")
+  }
+
+  async uploadFile(file: File): Promise<UploadResponse> {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      body: formData,
+    })
+
+    return this.handleResponse<UploadResponse>(response)
   }
 
   async runPhase01(runId: string, request: IngestionRequest): Promise<Record<string, unknown>> {
