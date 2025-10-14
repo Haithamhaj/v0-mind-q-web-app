@@ -1,11 +1,43 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Activity, CheckCircle2, AlertCircle, Clock, TrendingUp, Database, FileText } from "lucide-react"
-import Link from "next/link"
+import { Activity, CheckCircle2, AlertCircle, Clock, TrendingUp, Database, FileText, Loader2 } from "lucide-react"
+import { api } from "@/lib/api"
+
+type HealthState = "unknown" | "healthy" | "unhealthy"
 
 export default function DashboardPage() {
+  const [healthState, setHealthState] = useState<HealthState>("unknown")
+  const [healthDetails, setHealthDetails] = useState<Record<string, unknown> | null>(null)
+  const [healthError, setHealthError] = useState<string | null>(null)
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false)
+
+  const fetchHealth = async () => {
+    setIsCheckingHealth(true)
+    setHealthError(null)
+
+    try {
+      const response = await api.healthCheck()
+      setHealthDetails(response)
+      setHealthState("healthy")
+    } catch (error) {
+      setHealthDetails(null)
+      setHealthState("unhealthy")
+      setHealthError(error instanceof Error ? error.message : "Unable to reach pipeline API")
+    } finally {
+      setIsCheckingHealth(false)
+    }
+  }
+
+  useEffect(() => {
+    void fetchHealth()
+  }, [])
+
   return (
     <div className="flex h-screen">
       <Sidebar />
@@ -161,17 +193,49 @@ export default function DashboardPage() {
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>System Health</CardTitle>
-              <CardDescription>Current platform status and metrics</CardDescription>
+              <CardDescription>
+                Current platform status and metrics. Last checked{" "}
+                {isCheckingHealth ? "just now" : "on page load"}
+              </CardDescription>
+              <div className="mt-4 flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => void fetchHealth()} disabled={isCheckingHealth}>
+                  {isCheckingHealth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Refresh Health
+                </Button>
+                {healthError ? <span className="text-xs text-destructive">{healthError}</span> : null}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4">
                   <div className="mb-2 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-secondary" />
-                    <span className="text-sm font-medium text-foreground">API Status</span>
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        healthState === "healthy" ? "bg-secondary" : healthState === "unhealthy" ? "bg-destructive" : "bg-muted-foreground"
+                      }`}
+                    />
+                    <span className="text-sm font-medium text-foreground">
+                      API Status {healthState === "unknown" && "(checking...)"}
+                    </span>
                   </div>
-                  <p className="text-2xl font-bold text-secondary">Operational</p>
-                  <p className="text-xs text-muted-foreground">All endpoints responding</p>
+                  <p
+                    className={`text-2xl font-bold ${
+                      healthState === "healthy"
+                        ? "text-secondary"
+                        : healthState === "unhealthy"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {healthState === "healthy" ? "Operational" : healthState === "unhealthy" ? "Unavailable" : "Pending"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {healthState === "healthy"
+                      ? "All endpoints responding"
+                      : healthState === "unhealthy"
+                        ? "Check backend service on port 9000"
+                        : "Awaiting health check response"}
+                  </p>
                 </div>
 
                 <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
@@ -194,6 +258,20 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {healthDetails ? (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Health Payload</CardTitle>
+                <CardDescription>Latest response from /healthz</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="max-h-64 overflow-auto rounded-md bg-muted/50 p-4 text-xs text-foreground">
+                  {JSON.stringify(healthDetails, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          ) : null}
         </main>
       </div>
     </div>

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Play, Plus, X } from "lucide-react"
+import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -34,6 +34,8 @@ export default function PhasesPage() {
   const [slaFiles, setSlaFiles] = useState<string[]>([])
   const [configJson, setConfigJson] = useState("")
   const [isRunning, setIsRunning] = useState(false)
+  const [phaseResult, setPhaseResult] = useState<Record<string, unknown> | null>(null)
+  const [phaseError, setPhaseError] = useState<string | null>(null)
   const { toast } = useToast()
 
   const dataFileInputRef = useRef<HTMLInputElement>(null)
@@ -100,6 +102,8 @@ export default function PhasesPage() {
     }
 
     setIsRunning(true)
+    setPhaseResult(null)
+    setPhaseError(null)
     console.log("[v0] Starting phase execution...")
 
     try {
@@ -120,6 +124,8 @@ export default function PhasesPage() {
         }
       }
 
+      let response: Record<string, unknown> | null = null
+
       if (selectedPhase === "01") {
         // Phase 01 has special handling
         if (dataFiles.filter((f) => f.trim()).length === 0) {
@@ -134,7 +140,7 @@ export default function PhasesPage() {
         }
 
         console.log("[v0] Executing Phase 01 with ingestion request")
-        await api.runPhase01(runId, {
+        response = await api.runPhase01(runId, {
           data_files: dataFiles.filter((f) => f.trim()),
           sla_files: slaFiles.filter((f) => f.trim()),
           config,
@@ -142,19 +148,23 @@ export default function PhasesPage() {
       } else {
         // Other phases use standard request
         console.log("[v0] Executing Phase", selectedPhase, "with standard request")
-        await api.runPhase(runId, selectedPhase, {
+        response = await api.runPhase(runId, selectedPhase, {
           config,
           use_defaults: true,
         })
       }
 
-      console.log("[v0] Phase execution successful")
+      setPhaseResult(response)
+      setPhaseError(null)
+      console.log("[v0] Phase execution successful:", response)
       toast({
         title: "Phase Started",
         description: `Phase ${selectedPhase} is now running for ${runId}`,
       })
     } catch (error) {
       console.error("[v0] Phase execution failed:", error)
+      setPhaseResult(null)
+      setPhaseError(error instanceof Error ? error.message : "Unknown error occurred")
       toast({
         title: "Phase Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -355,6 +365,33 @@ export default function PhasesPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {(phaseResult || phaseError) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Last Phase Response</CardTitle>
+                  <CardDescription>
+                    {!phaseResult && phaseError ? "Phase request failed" : "Latest response payload"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {phaseError ? (
+                    <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-4">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
+                      <div>
+                        <p className="font-medium text-destructive">Phase call failed</p>
+                        <p className="text-sm text-destructive/80">{phaseError}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {phaseResult ? (
+                    <pre className="max-h-64 overflow-auto rounded-md border border-border bg-muted/20 p-4 text-xs text-foreground">
+                      {JSON.stringify(phaseResult, null, 2)}
+                    </pre>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Phase Dependencies */}
             <Card>

@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
+import type { PipelineResponse } from "@/lib/api"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Play, Plus, X } from "lucide-react"
+import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -21,6 +22,8 @@ export default function PipelinePage() {
   const [stopOnError, setStopOnError] = useState(true)
   const [llmSummary, setLlmSummary] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
+  const [pipelineResult, setPipelineResult] = useState<PipelineResponse | null>(null)
+  const [pipelineError, setPipelineError] = useState<string | null>(null)
   const { toast } = useToast()
 
   const dataFileInputRef = useRef<HTMLInputElement>(null)
@@ -87,6 +90,8 @@ export default function PipelinePage() {
     }
 
     setIsRunning(true)
+    setPipelineResult(null)
+    setPipelineError(null)
     console.log("[v0] Starting pipeline execution...")
 
     try {
@@ -98,12 +103,16 @@ export default function PipelinePage() {
       })
 
       console.log("[v0] Pipeline execution successful:", result)
+      setPipelineResult(result)
+      setPipelineError(null)
       toast({
         title: "Pipeline Started",
         description: `Pipeline ${result.run_id} is now running`,
       })
     } catch (error) {
       console.error("[v0] Pipeline execution failed:", error)
+      setPipelineResult(null)
+      setPipelineError(error instanceof Error ? error.message : "Unknown error occurred")
       toast({
         title: "Pipeline Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -244,6 +253,42 @@ export default function PipelinePage() {
                 </Button>
               </CardContent>
             </Card>
+
+            {(pipelineResult || pipelineError) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Last Pipeline Response</CardTitle>
+                  <CardDescription>
+                    {!pipelineResult && pipelineError ? "Pipeline request failed" : "Latest response payload"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {pipelineError ? (
+                    <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-4">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
+                      <div>
+                        <p className="font-medium text-destructive">Pipeline call failed</p>
+                        <p className="text-sm text-destructive/80">{pipelineError}</p>
+                      </div>
+                    </div>
+                  ) : null}
+                  {pipelineResult ? (
+                    <div className="space-y-3">
+                      <div className="rounded-md border border-border bg-muted/20 p-4">
+                        <p className="text-sm font-medium text-muted-foreground">Run ID</p>
+                        <p className="font-mono text-sm text-foreground">{pipelineResult.run_id}</p>
+                      </div>
+                      <div className="rounded-md border border-border bg-muted/20 p-4">
+                        <p className="text-sm font-medium text-muted-foreground">Phases Payload</p>
+                        <pre className="max-h-64 overflow-auto text-xs text-foreground">
+                          {JSON.stringify(pipelineResult.phases, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Pipeline Stages Overview */}
             <Card>
