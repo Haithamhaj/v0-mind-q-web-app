@@ -5,7 +5,7 @@
 
 :root {
   /* Mind-Q custom color theme based on provided palette */
-  --background: #f557fa; /* Cloud - light background */
+  --background: #f5f7fa; /* Cloud - light background */
   --foreground: #0e0f12; /* Ink - dark text */
   --card: #ffffff;
   --card-foreground: #0e0f12;
@@ -16,21 +16,21 @@
   --secondary: #25d3c0; /* Turquoise */
   --secondary-foreground: #0e0f12;
   --muted: #6c7480; /* Metal Grey */
-  --muted-foreground: #f557fa;
+  --muted-foreground: #f5f7fa; /* Cloud */
   --accent: #25d3c0; /* Turquoise */
   --accent-foreground: #0e0f12;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #6c7480;
-  --input: #6c7480;
+  --border: #6c7480; /* Metal Grey */
+  --input: #6c7480; /* Metal Grey */
   --ring: #6b2bd8;
   --chart-1: #6b2bd8; /* Tech Purple */
   --chart-2: #25d3c0; /* Turquoise */
   --chart-3: #0c1d3a; /* Deep Blue */
   --chart-4: #6c7480; /* Metal Grey */
-  --chart-5: #f557fa; /* Cloud */
+  --chart-5: #0e0f12; /* Ink */
   --radius: 0.5rem;
-  --sidebar: #f557fa; /* Cloud */
+  --sidebar: #f5f7fa; /* Cloud */
   --sidebar-foreground: #0e0f12; /* Ink */
   --sidebar-primary: #6b2bd8; /* Tech Purple */
   --sidebar-primary-foreground: #ffffff;
@@ -43,17 +43,17 @@
 .dark {
   /* Dark theme using Deep Blue and Ink as primary backgrounds */
   --background: #0e0f12; /* Ink - darkest background */
-  --foreground: #f557fa; /* Cloud - light text */
+  --foreground: #f5f7fa; /* Cloud - light text */
   --card: #0c1d3a; /* Deep Blue - card background */
-  --card-foreground: #f557fa;
+  --card-foreground: #f5f7fa;
   --popover: #0c1d3a;
-  --popover-foreground: #f557fa;
+  --popover-foreground: #f5f7fa;
   --primary: #6b2bd8; /* Tech Purple */
   --primary-foreground: #ffffff;
   --secondary: #25d3c0; /* Turquoise */
   --secondary-foreground: #0e0f12;
   --muted: #6c7480; /* Metal Grey */
-  --muted-foreground: #f557fa;
+  --muted-foreground: #f5f7fa;
   --accent: #25d3c0; /* Turquoise */
   --accent-foreground: #0e0f12;
   --destructive: #ef4444;
@@ -65,9 +65,9 @@
   --chart-2: #25d3c0;
   --chart-3: #0c1d3a;
   --chart-4: #6c7480;
-  --chart-5: #f557fa;
+  --chart-5: #f5f7fa;
   --sidebar: #0e0f12; /* Ink */
-  --sidebar-foreground: #f557fa; /* Cloud */
+  --sidebar-foreground: #f5f7fa; /* Cloud */
   --sidebar-primary: #6b2bd8; /* Tech Purple */
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #25d3c0; /* Turquoise */
@@ -114,7 +114,7 @@
   --color-turquoise: #25d3c0;
   --color-metal-grey: #6c7480;
   --color-ink: #0e0f12;
-  --color-cloud: #f557fa;
+  --color-cloud: #f5f7fa;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
