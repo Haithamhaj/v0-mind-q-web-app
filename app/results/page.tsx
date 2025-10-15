@@ -1,119 +1,433 @@
 "use client"
 
 import type React from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import * as echarts from "echarts"
+import { Loader2, Download, Search, FileJson, FileSpreadsheet, FileCode, CheckCircle2 } from "lucide-react"
 
-import { useState } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import {
-  FileText,
-  Download,
-  Search,
-  FileJson,
-  FileSpreadsheet,
-  FileCode,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-} from "lucide-react"
+  api,
+  ArtifactContentResponse,
+  ArtifactPhaseInfo,
+  BiMetricResponse,
+  PipelineRunInfo,
+  RunArtifactsResponse,
+  RunListResponse,
+} from "@/lib/api"
 
-const mockArtifacts = [
-  {
-    runId: "run_2024_001",
-    phase: "01",
-    name: "Ingestion",
-    artifacts: [
-      { name: "raw.parquet", type: "parquet", size: "2.4 MB", status: "success" },
-      { name: "meta_ingestion.json", type: "json", size: "12 KB", status: "success" },
-      { name: "sla_manifest.json", type: "json", size: "8 KB", status: "success" },
+interface ChartProps {
+  option: echarts.EChartsOption
+}
+
+const chartBackground = "#0F172A"
+
+function EChart({ option }: ChartProps) {
+  const chartRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!chartRef.current) {
+      return
+    }
+    const instance = echarts.init(chartRef.current)
+    instance.setOption(option, true)
+    const handleResize = () => instance.resize()
+    window.addEventListener("resize", handleResize)
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      instance.dispose()
+    }
+  }, [option])
+
+  return <div ref={chartRef} className="h-80 w-full rounded-lg border border-border bg-card" />
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return "0 B"
+  const units = ["B", "KB", "MB", "GB", "TB"]
+  let size = bytes
+  let index = 0
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024
+    index += 1
+  }
+  return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
+}
+
+function createMetricOption(
+  metric: Record<string, unknown> | undefined,
+  response: BiMetricResponse | null,
+): echarts.EChartsOption {
+  const rows = response?.data ?? []
+
+  const metricName = metric && typeof metric["name"] === "string" ? (metric["name"] as string) : undefined
+  const metricId = metric && typeof metric["id"] === "string" ? (metric["id"] as string) : undefined
+  const defaultChart =
+    metric && typeof metric["default_chart"] === "string" ? (metric["default_chart"] as string) : "line"
+  const unitValue = metric && typeof metric["unit"] === "string" ? (metric["unit"] as string) : ""
+
+  if (!metric || !rows.length) {
+    return {
+      backgroundColor: chartBackground,
+      title: {
+        text: metric ? String(metricName ?? metricId ?? "Metric") : "Metric",
+        left: "center",
+        textStyle: { color: "#E2E8F0", fontWeight: "600" },
+      },
+      graphic: {
+        type: "text",
+        left: "center",
+        top: "middle",
+        style: {
+          text: "No data available for this metric",
+          fill: "#64748B",
+          fontSize: 16,
+        },
+      },
+    }
+  }
+
+  const firstRow = rows[0] ?? {}
+  const keys = Object.keys(firstRow)
+  const numericKey = keys.find((key) => typeof (firstRow as Record<string, unknown>)[key] === "number") || "val"
+  const categoryKey = keys.find((key) => key !== numericKey) || "category"
+
+  const chartType = defaultChart === "bar" ? "bar" : defaultChart === "line" ? "line" : "line"
+
+  const categories = rows.map((row) => String((row as Record<string, unknown>)[categoryKey] ?? ""))
+  const values = rows.map((row) => Number((row as Record<string, unknown>)[numericKey] ?? 0))
+
+  const titleText = String(metricName ?? metricId ?? "Metric")
+
+  return {
+    backgroundColor: chartBackground,
+    title: {
+      text: titleText,
+      left: "center",
+      textStyle: { color: "#E2E8F0", fontWeight: "600", fontSize: 16 },
+    },
+    tooltip: {
+      trigger: chartType === "bar" ? "item" : "axis",
+      backgroundColor: "#1E293B",
+      borderColor: "#334155",
+      valueFormatter: (value) => {
+        if (typeof value !== "number") return String(value ?? "")
+        const formatted = Math.abs(value) >= 1000 ? value.toLocaleString() : value.toFixed(2)
+        return unitValue ? `${formatted} ${unitValue}` : formatted
+      },
+    },
+    grid: {
+      left: "5%",
+      right: "4%",
+      bottom: 60,
+      containLabel: true,
+    },
+    xAxis: {
+      type: "category",
+      boundaryGap: chartType === "bar",
+      data: categories,
+      axisLabel: {
+        color: "#94A3B8",
+        rotate: categories.length > 12 ? 45 : 0,
+      },
+      axisLine: { lineStyle: { color: "#1E293B" } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: "#94A3B8" },
+      splitLine: { lineStyle: { color: "#1E293B" } },
+    },
+    dataZoom: rows.length > 25 ? [{ type: "inside" }, { type: "slider" }] : undefined,
+    series: [
+      {
+        name: titleText,
+        type: chartType,
+        smooth: chartType === "line",
+        showSymbol: chartType !== "bar",
+        lineStyle: { width: 3, color: "#38BDF8" },
+        itemStyle: {
+          color: chartType === "bar" ? "#6366F1" : "#38BDF8",
+        },
+        areaStyle: chartType === "line" ? { opacity: 0.12, color: "#38BDF8" } : undefined,
+        data: values,
+      },
     ],
-  },
-  {
-    runId: "run_2024_001",
-    phase: "02",
-    name: "Quality",
-    artifacts: [
-      { name: "quality_report.json", type: "json", size: "45 KB", status: "success" },
-      { name: "issues_catalog.json", type: "json", size: "23 KB", status: "warn" },
-    ],
-  },
-  {
-    runId: "run_2024_001",
-    phase: "07",
-    name: "Readiness",
-    artifacts: [
-      { name: "readiness_report.json", type: "json", size: "67 KB", status: "success" },
-      { name: "correlation_matrix.json", type: "json", size: "156 KB", status: "success" },
-      { name: "leakage_analysis.json", type: "json", size: "34 KB", status: "success" },
-    ],
-  },
-  {
-    runId: "run_2024_001",
-    phase: "08",
-    name: "Insights",
-    artifacts: [
-      { name: "insights_report.json", type: "json", size: "89 KB", status: "success" },
-      { name: "story_ops.json", type: "json", size: "45 KB", status: "success" },
-      { name: "diagnostics.json", type: "json", size: "56 KB", status: "success" },
-      { name: "segment_stats.parquet", type: "parquet", size: "1.2 MB", status: "success" },
-    ],
-  },
-  {
-    runId: "run_2024_001",
-    phase: "09",
-    name: "Business Validation",
-    artifacts: [
-      { name: "validation_report.json", type: "json", size: "123 KB", status: "success" },
-      { name: "bi_feed.parquet", type: "parquet", size: "3.1 MB", status: "success" },
-      { name: "sla_summary.json", type: "json", size: "34 KB", status: "success" },
-      { name: "bi_whitelist.jsonl", type: "jsonl", size: "78 KB", status: "success" },
-    ],
-  },
-]
+  }
+}
+
+function getFileIcon(extension: string) {
+  switch (extension) {
+    case ".json":
+    case ".jsonl":
+    case ".yaml":
+    case ".yml":
+      return <FileJson className="h-5 w-5 text-primary" />
+    case ".parquet":
+    case ".csv":
+      return <FileSpreadsheet className="h-5 w-5 text-secondary" />
+    default:
+      return <FileCode className="h-5 w-5 text-muted-foreground" />
+  }
+}
+
+function serializeContent(preview: ArtifactContentResponse | null): string {
+  if (!preview) {
+    return ""
+  }
+  if (typeof preview.content === "string") {
+    return preview.content
+  }
+  return JSON.stringify(preview.content, null, 2)
+}
+
+function formatDateTime(value: string): string {
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
+
+function Label({ children, className, ...props }: React.ComponentPropsWithoutRef<"label">) {
+  return (
+    <label
+      className={`text-sm font-medium leading-none text-muted-foreground ${className ?? ""}`}
+      {...props}
+    >
+      {children}
+    </label>
+  )
+}
 
 export default function ResultsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedRun, setSelectedRun] = useState("run_2024_001")
+  const [runs, setRuns] = useState<PipelineRunInfo[]>([])
+  const [selectedRun, setSelectedRun] = useState<string>("")
+  const [artifacts, setArtifacts] = useState<ArtifactPhaseInfo[]>([])
+  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [artifactPreview, setArtifactPreview] = useState<ArtifactContentResponse | null>(null)
+  const [selectedFilePath, setSelectedFilePath] = useState<string>("")
+  const [metrics, setMetrics] = useState<Array<Record<string, unknown>>>([])
+  const [selectedMetricId, setSelectedMetricId] = useState<string>("")
+  const [metricResponse, setMetricResponse] = useState<BiMetricResponse | null>(null)
 
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case "json":
-      case "jsonl":
-        return <FileJson className="h-5 w-5 text-primary" />
-      case "parquet":
-        return <FileSpreadsheet className="h-5 w-5 text-secondary" />
-      case "md":
-        return <FileText className="h-5 w-5 text-muted-foreground" />
-      default:
-        return <FileCode className="h-5 w-5 text-muted-foreground" />
+  const [isLoadingRuns, setIsLoadingRuns] = useState<boolean>(true)
+  const [runsError, setRunsError] = useState<string | null>(null)
+  const [isLoadingArtifacts, setIsLoadingArtifacts] = useState<boolean>(false)
+  const [artifactsError, setArtifactsError] = useState<string | null>(null)
+  const [isPreviewLoading, setIsPreviewLoading] = useState<boolean>(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [isMetricLoading, setIsMetricLoading] = useState<boolean>(false)
+  const [metricError, setMetricError] = useState<string | null>(null)
+
+  const refreshRuns = useCallback(() => {
+    setIsLoadingRuns(true)
+    setRunsError(null)
+    api
+      .listRuns()
+      .then((response: RunListResponse) => {
+        const orderedRuns = response.runs
+        setRuns(orderedRuns)
+        if (orderedRuns.length === 0) {
+          setSelectedRun("")
+          return
+        }
+        const runIds = new Set(orderedRuns.map((run) => run.run_id))
+        if (!selectedRun || !runIds.has(selectedRun)) {
+          setSelectedRun(orderedRuns[0].run_id)
+        }
+      })
+      .catch((error: Error) => {
+        setRuns([])
+        setRunsError(error.message)
+      })
+      .finally(() => {
+        setIsLoadingRuns(false)
+      })
+  }, [selectedRun])
+
+  useEffect(() => {
+    refreshRuns()
+  }, [refreshRuns])
+
+  useEffect(() => {
+    if (!selectedRun) {
+      setArtifacts([])
+      setMetrics([])
+      setSelectedMetricId("")
+      setArtifactPreview(null)
+      setSelectedFilePath("")
+      return
     }
-  }
+    let active = true
+    setIsLoadingArtifacts(true)
+    setArtifactsError(null)
+    setArtifactPreview(null)
+    setSelectedFilePath("")
+    Promise.all([api.listRunArtifacts(selectedRun), api.getBiMeta(selectedRun)])
+      .then(([artifactResponse, metaResponse]: [RunArtifactsResponse, Record<string, unknown>]) => {
+        if (!active) return
+        setArtifacts(artifactResponse.phases || [])
+        const metaRecord = metaResponse as Record<string, unknown>
+        const semanticPayload =
+          metaRecord && typeof metaRecord["semantic"] === "object"
+            ? (metaRecord["semantic"] as Record<string, unknown>)
+            : undefined
+        const semanticMetricsCandidate =
+          semanticPayload && Array.isArray(semanticPayload["metrics"])
+            ? (semanticPayload["metrics"] as Array<Record<string, unknown>>)
+            : null
+        const rawMetrics =
+          semanticMetricsCandidate ??
+          (Array.isArray(metaRecord["metrics"])
+            ? (metaRecord["metrics"] as Array<Record<string, unknown>>)
+            : [])
+        setMetrics(rawMetrics)
+        if (rawMetrics.length) {
+          const metricIds = rawMetrics.map((item) => String(item.id ?? ""))
+          if (!metricIds.includes(selectedMetricId)) {
+            setSelectedMetricId(metricIds[0])
+          }
+        } else {
+          setSelectedMetricId("")
+        }
+      })
+      .catch((error: Error) => {
+        if (!active) return
+        setArtifactsError(error.message)
+        setArtifacts([])
+        setMetrics([])
+        setSelectedMetricId("")
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoadingArtifacts(false)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [selectedRun, selectedMetricId])
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "success":
-        return <CheckCircle2 className="h-4 w-4 text-secondary" />
-      case "warn":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
-      case "error":
-        return <XCircle className="h-4 w-4 text-destructive" />
-      default:
+  const filteredPhases = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) {
+      return artifacts
+    }
+    return artifacts
+      .map((phase) => {
+        const matchesPhase =
+          phase.label.toLowerCase().includes(query) || phase.id.toLowerCase().includes(query)
+        if (matchesPhase) {
+          return phase
+        }
+        const files = phase.files.filter(
+          (file) =>
+            file.name.toLowerCase().includes(query) || file.path.toLowerCase().includes(query),
+        )
+        if (files.length) {
+          return { ...phase, files }
+        }
         return null
+      })
+      .filter((phase): phase is ArtifactPhaseInfo => Boolean(phase && phase.files.length))
+  }, [artifacts, searchQuery])
+
+  const selectedMetric = useMemo(
+    () => metrics.find((metric) => String(metric.id ?? "") === selectedMetricId),
+    [metrics, selectedMetricId],
+  )
+
+  const chartOption = useMemo(
+    () => createMetricOption(selectedMetric, metricResponse),
+    [selectedMetric, metricResponse],
+  )
+
+  const handleViewArtifact = async (path: string) => {
+    if (!selectedRun) return
+    setIsPreviewLoading(true)
+    setPreviewError(null)
+    setSelectedFilePath(path)
+    try {
+      const preview = await api.getArtifactContent(selectedRun, path)
+      setArtifactPreview(preview)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load artifact"
+      setPreviewError(message)
+      setArtifactPreview(null)
+    } finally {
+      setIsPreviewLoading(false)
     }
   }
 
-  const filteredArtifacts = mockArtifacts.filter(
-    (group) =>
-      group.runId === selectedRun &&
-      (searchQuery === "" ||
-        group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        group.artifacts.some((a) => a.name.toLowerCase().includes(searchQuery.toLowerCase()))),
+  const handleDownloadArtifact = async (path: string) => {
+    if (!selectedRun) return
+    setPreviewError(null)
+    try {
+      const preview = await api.getArtifactContent(selectedRun, path)
+      const contentText =
+        typeof preview.content === "string"
+          ? preview.content
+          : JSON.stringify(preview.content, null, 2)
+      const blob = new Blob([contentText], { type: "application/json;charset=utf-8" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = path.split("/").pop() || "artifact.json"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to download artifact"
+      setPreviewError(message)
+    }
+  }
+
+  const hasRuns = runs.length > 0
+  const selectedRunInfo = runs.find((run) => run.run_id === selectedRun) ?? null
+  const metricSql =
+    selectedMetric && typeof selectedMetric["sql"] === "string"
+      ? (selectedMetric["sql"] as string)
+      : null
+  const previewContent = serializeContent(artifactPreview)
+  const artifactFileCount = useMemo(
+    () => artifacts.reduce((total, phase) => total + phase.files.length, 0),
+    [artifacts],
   )
+
+  useEffect(() => {
+    if (!selectedRun || !selectedMetricId) {
+      setMetricResponse(null)
+      return
+    }
+    let active = true
+    setIsMetricLoading(true)
+    setMetricError(null)
+    api
+      .getBiMetric(selectedRun, selectedMetricId)
+      .then((response) => {
+        if (!active) return
+        setMetricResponse(response)
+      })
+      .catch((error: Error) => {
+        if (!active) return
+        setMetricError(error.message)
+        setMetricResponse(null)
+      })
+      .finally(() => {
+        if (active) {
+          setIsMetricLoading(false)
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [selectedRun, selectedMetricId])
 
   return (
     <div className="flex h-screen">
@@ -124,197 +438,259 @@ export default function ResultsPage() {
           <div className="mx-auto max-w-7xl space-y-6">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Results & Artifacts</h1>
-              <p className="text-muted-foreground">Browse and download pipeline outputs</p>
+              <p className="text-muted-foreground">
+                Browse pipeline outputs, inspect stage artifacts, and explore BI charts powered by
+                Apache ECharts.
+              </p>
             </div>
 
-            {/* Run Selector and Search */}
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex-1">
-                    <Label className="mb-2 block text-sm font-medium">Select Run</Label>
+              <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle>Run Selection</CardTitle>
+                  <CardDescription>
+                    Choose a pipeline run and search for artifacts across all phases.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={refreshRuns} disabled={isLoadingRuns}>
+                    {isLoadingRuns ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Refreshing
+                      </>
+                    ) : (
+                      "Refresh"
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-[2fr,1fr]">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="run-select">Select Run</Label>
                     <select
+                      id="run-select"
                       value={selectedRun}
-                      onChange={(e) => setSelectedRun(e.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onChange={(event) => setSelectedRun(event.target.value)}
+                      className="w-full rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary"
+                      disabled={!hasRuns || isLoadingRuns}
                     >
-                      <option value="run_2024_001">run_2024_001</option>
-                      <option value="run_2024_002">run_2024_002</option>
-                      <option value="run_2024_003">run_2024_003</option>
+                      {!hasRuns && <option value="">No runs available</option>}
+                      {runs.map((run) => (
+                        <option key={run.run_id} value={run.run_id}>
+                          {run.run_id}
+                        </option>
+                      ))}
                     </select>
+                    {selectedRunInfo && (
+                      <p className="text-xs text-muted-foreground">
+                        Last updated: {formatDateTime(selectedRunInfo.updated_at)}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <Label className="mb-2 block text-sm font-medium">Search Artifacts</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="artifact-search">Search Artifacts</Label>
+                    <div className="relative flex items-center">
+                      <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Search by phase or file name..."
+                        id="artifact-search"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder="Search by phase or file name..."
+                        className="pl-9"
+                        disabled={!hasRuns}
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {artifactFileCount} file{artifactFileCount === 1 ? "" : "s"} across {artifacts.length} phase{artifacts.length === 1 ? "" : "s"}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Artifacts by Phase */}
-            <div className="space-y-4">
-              {filteredArtifacts.map((group) => (
-                <Card key={`${group.runId}-${group.phase}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="bg-primary/10 text-primary">
-                          Phase {group.phase}
-                        </Badge>
-                        <CardTitle className="text-lg">{group.name}</CardTitle>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <Download className="mr-2 h-4 w-4" />
-                        Download All
-                      </Button>
+            {runsError && (
+              <Card className="border-destructive/40 bg-destructive/10">
+                <CardContent className="py-4 text-destructive-foreground">
+                  Failed to load pipeline runs: {runsError}
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pipeline Artifacts</CardTitle>
+                  <CardDescription>
+                    Actual outputs fetched from the backend artifacts directory.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isLoadingArtifacts ? (
+                    <div className="flex items-center justify-center py-12 text-muted-foreground">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Loading artifacts…
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {group.artifacts.map((artifact, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded-lg border border-border bg-card/50 p-4 transition-colors hover:bg-accent/10"
-                        >
-                          <div className="flex items-center gap-4">
-                            {getFileIcon(artifact.type)}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-mono text-sm font-medium text-foreground">{artifact.name}</p>
-                                {getStatusIcon(artifact.status)}
-                              </div>
-                              <p className="text-xs text-muted-foreground">{artifact.size}</p>
-                            </div>
-                          </div>
+                  ) : artifactsError ? (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive-foreground">
+                      {artifactsError}
+                    </div>
+                  ) : filteredPhases.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-border/60 p-6 text-center text-sm text-muted-foreground">
+                      {hasRuns
+                        ? "No artifacts match the current search."
+                        : "Select a run to view its artifacts."}
+                    </div>
+                  ) : (
+                    filteredPhases.map((phase) => (
+                      <div key={phase.id} className="space-y-3 rounded-lg border border-border/60 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm">
-                              View
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Download className="h-4 w-4" />
-                            </Button>
+                            <Badge variant="outline">{phase.label}</Badge>
+                            <span className="text-xs text-muted-foreground">{phase.id}</span>
                           </div>
+                          <span className="text-xs text-muted-foreground">
+                            {phase.files.length} file{phase.files.length === 1 ? "" : "s"}
+                          </span>
                         </div>
-                      ))}
+                        <div className="space-y-2">
+                          {phase.files.map((file) => {
+                            const extension = file.name.split(".").pop()?.toLowerCase() ?? ""
+                            return (
+                              <div
+                                key={file.path}
+                                className="flex items-center justify-between gap-3 rounded-md border border-border/40 bg-muted/10 px-3 py-2"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {getFileIcon(extension)}
+                                  <div>
+                                    <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                      {file.name}
+                                      <CheckCircle2 className="h-4 w-4 text-secondary" />
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatBytes(file.size)} | {formatDateTime(file.updated_at)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleViewArtifact(file.path)}
+                                    disabled={isPreviewLoading}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={() => handleDownloadArtifact(file.path)}>
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Stage 10 BI Metrics</CardTitle>
+                    <CardDescription>
+                      Interactive charts rendered with Apache ECharts using semantic layer SQL.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="metric-select">Select Metric</Label>
+                      <select
+                        id="metric-select"
+                        value={selectedMetricId}
+                        onChange={(event) => setSelectedMetricId(event.target.value)}
+                        className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-foreground outline-none focus-visible:border-primary"
+                        disabled={metrics.length === 0}
+                      >
+                        {metrics.length === 0 && <option value="">No metrics available</option>}
+                        {metrics.map((metric) => {
+                          const metricId = String(metric.id ?? "")
+                          return (
+                            <option key={metricId} value={metricId}>
+                              {String(metric.name ?? metricId)}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                    {metricError && (
+                      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-foreground">
+                        {metricError}
+                      </div>
+                    )}
+                    {isMetricLoading ? (
+                      <div className="flex items-center justify-center py-16 text-muted-foreground">
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Loading chart…
+                      </div>
+                    ) : (
+                      <EChart option={chartOption} />
+                    )}
+                    {metricSql && (
+                      <div className="rounded-md border border-border/40 bg-muted/10 p-3">
+                        <Label className="text-xs uppercase text-muted-foreground">SQL</Label>
+                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                          {metricSql}
+                        </pre>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Artifact Viewer</CardTitle>
+                    <CardDescription>
+                      Inline preview for JSON, JSONL, CSV, YAML, and text artifacts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedFilePath ? (
+                      <div className="text-xs text-muted-foreground">
+                        Viewing: <span className="font-mono text-foreground">{selectedFilePath}</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Select a file to preview its contents.</p>
+                    )}
+                    {previewError && (
+                      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive-foreground">
+                        {previewError}
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                      {isPreviewLoading ? (
+                        <div className="flex items-center justify-center py-10 text-muted-foreground">
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Loading artifact content…
+                        </div>
+                      ) : previewContent ? (
+                        <pre className="max-h-96 overflow-auto text-xs leading-relaxed text-muted-foreground">
+                          {previewContent}
+                        </pre>
+                      ) : (
+                        <div className="py-8 text-center text-sm text-muted-foreground">No artifact selected.</div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              </div>
             </div>
-
-            {/* Artifact Details Viewer */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Artifact Viewer</CardTitle>
-                <CardDescription>Preview artifact contents</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="validation">
-                  <TabsList>
-                    <TabsTrigger value="validation">Validation Report</TabsTrigger>
-                    <TabsTrigger value="insights">Insights</TabsTrigger>
-                    <TabsTrigger value="sla">SLA Summary</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="validation" className="space-y-4">
-                    <div className="rounded-lg border border-border bg-muted/20 p-4">
-                      <pre className="overflow-x-auto text-xs">
-                        {JSON.stringify(
-                          {
-                            run_id: "run_2024_001",
-                            timestamp: "2024-01-15T10:30:00Z",
-                            status: "PASS",
-                            kpi_results: {
-                              on_time_delivery: { value: 94.5, target: 90, status: "PASS" },
-                              cost_efficiency: { value: 87.2, target: 85, status: "PASS" },
-                              quality_score: { value: 96.8, target: 95, status: "PASS" },
-                            },
-                            rules_evaluated: 12,
-                            rules_passed: 11,
-                            rules_warned: 1,
-                          },
-                          null,
-                          2,
-                        )}
-                      </pre>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="insights" className="space-y-4">
-                    <div className="space-y-3">
-                      <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4">
-                        <h4 className="mb-2 font-semibold text-foreground">Key Insight</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Delivery performance improved by 12% in the last quarter, driven by optimized routing
-                          algorithms and reduced transit times in urban areas.
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
-                        <h4 className="mb-2 font-semibold text-foreground">Operational Story</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Cost efficiency metrics show strong correlation with vehicle utilization rates. Segments with
-                          80%+ utilization demonstrate 15% better cost performance.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="sla" className="space-y-4">
-                    <div className="space-y-3">
-                      {[
-                        { term: "On-Time Delivery", status: "PASS", actual: "94.5%", target: "90%" },
-                        { term: "Cost per Mile", status: "PASS", actual: "$2.34", target: "$2.50" },
-                        { term: "Customer Satisfaction", status: "WARN", actual: "88%", target: "90%" },
-                      ].map((sla, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded-lg border border-border p-4"
-                        >
-                          <div>
-                            <p className="font-medium text-foreground">{sla.term}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Actual: {sla.actual} | Target: {sla.target}
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={
-                              sla.status === "PASS"
-                                ? "bg-secondary/20 text-secondary"
-                                : "bg-yellow-500/20 text-yellow-500"
-                            }
-                          >
-                            {sla.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
           </div>
         </main>
       </div>
     </div>
-  )
-}
-
-function Label({ children, className, ...props }: React.ComponentPropsWithoutRef<"label">) {
-  return (
-    <label
-      className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className}`}
-      {...props}
-    >
-      {children}
-    </label>
   )
 }

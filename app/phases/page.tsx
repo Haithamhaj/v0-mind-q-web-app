@@ -484,8 +484,8 @@ export default function PhasesPage(): React.JSX.Element {
                         Override settings such as <code>artifacts_root</code>, <code>timezone</code>, or <code>llm_enabled</code>.
                       </p>
                     </div>
+                  </TabsContent>
                   </Tabs>
-                </Tabs>
 
                 <Button
                   className="mt-2 w-full"

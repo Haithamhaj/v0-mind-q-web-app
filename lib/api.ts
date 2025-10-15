@@ -70,6 +70,52 @@ export interface BiPhaseResponse {
   builder?: Record<string, unknown>
 }
 
+export interface PipelineRunInfo {
+  run_id: string
+  path: string
+  updated_at: string
+}
+
+export interface RunListResponse {
+  artifacts_root: string
+  runs: PipelineRunInfo[]
+}
+
+export interface ArtifactFileInfo {
+  name: string
+  path: string
+  size: number
+  updated_at: string
+}
+
+export interface ArtifactPhaseInfo {
+  id: string
+  label: string
+  files: ArtifactFileInfo[]
+}
+
+export interface RunArtifactsResponse {
+  run_id: string
+  artifacts_root: string
+  phases: ArtifactPhaseInfo[]
+}
+
+export interface ArtifactContentResponse {
+  run_id: string
+  path: string
+  content_type: string
+  content: unknown
+}
+
+export interface BiMetricResponse {
+  run_id: string
+  metric: Record<string, unknown>
+  data: Array<Record<string, unknown>>
+  artifacts_root: string
+  timezone?: string
+  currency?: string
+}
+
 class MindQAPI {
   private baseURL: string
 
@@ -240,6 +286,29 @@ class MindQAPI {
 
   async runFullPipeline(runId: string, request: PipelineRequest): Promise<PipelineResponse> {
     return this.post(`/v1/runs/${runId}/pipeline/full`, request)
+  }
+
+  async listRuns(artifactsRoot?: string): Promise<RunListResponse> {
+    const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
+    return this.get(`/v1/runs${query}`)
+  }
+
+  async listRunArtifacts(runId: string, artifactsRoot?: string): Promise<RunArtifactsResponse> {
+    const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
+    return this.get(`/v1/runs/${runId}/artifacts${query}`)
+  }
+
+  async getBiMetric(runId: string, metricId: string, artifactsRoot?: string): Promise<BiMetricResponse> {
+    const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
+    return this.get(`/v1/bi/${runId}/metrics/${encodeURIComponent(metricId)}${query}`)
+  }
+
+  async getArtifactContent(runId: string, path: string, artifactsRoot?: string): Promise<ArtifactContentResponse> {
+    const params = new URLSearchParams({ path })
+    if (artifactsRoot) {
+      params.set("artifacts_root", artifactsRoot)
+    }
+    return this.get(`/v1/runs/${runId}/artifacts/content?${params.toString()}`)
   }
 }
 
