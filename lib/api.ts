@@ -67,6 +67,7 @@ export interface BiPhaseResponse {
   marts: BiMartPreview[]
   llm_enabled: boolean
   llm: BiLlmState
+  builder?: Record<string, unknown>
 }
 
 class MindQAPI {
@@ -204,6 +205,29 @@ class MindQAPI {
 
   async runPhase10(runId: string, request: PhaseRequest = {}): Promise<BiPhaseResponse> {
     return this.post(`/v1/runs/${runId}/phases/10/bi`, request)
+  }
+
+  async getBiMeta(runId: string, artifactsRoot?: string): Promise<Record<string, unknown>> {
+    const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
+    return this.get(`/v1/bi/${runId}/meta${query}`)
+  }
+
+  async biQuery(
+    runId: string,
+    sql: string,
+    options?: { artifacts_root?: string; timezone?: string; currency?: string; llm_enabled?: boolean },
+  ): Promise<{ rows: Array<Record<string, unknown>>; n: number }> {
+    const payload = { sql, ...(options ?? {}) }
+    return this.post(`/v1/bi/${runId}/query`, payload)
+  }
+
+  async biPlan(
+    runId: string,
+    question: string,
+    options?: { artifacts_root?: string; timezone?: string; currency?: string; llm_enabled?: boolean },
+  ): Promise<{ plan: Record<string, unknown>; data: Array<Record<string, unknown>> }> {
+    const payload = { question, ...(options ?? {}) }
+    return this.post(`/v1/bi/${runId}/llm-plan`, payload)
   }
 
   async runFeatureReport(runId: string, request: PhaseRequest): Promise<Record<string, unknown>> {
