@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 export const runtime = "nodejs"
 
-const DEFAULT_BACKEND_BASE = "http://localhost:8000"
+const DEFAULT_BACKEND_BASE = "http://localhost:9000"
 
 const getBackendBase = () => {
   const configured = process.env.MINDQ_API_BASE_URL?.trim()
@@ -72,16 +72,19 @@ const proxy = async (request: NextRequest, segments: string[]) => {
   })
 }
 
-export async function GET(request: NextRequest, context: { params: { segments: string[] } }) {
-  return proxy(request, context.params.segments)
+export async function GET(request: NextRequest, context: { params: Promise<{ segments: string[] }> }) {
+  const params = await context.params
+  return proxy(request, params.segments)
 }
 
-export async function POST(request: NextRequest, context: { params: { segments: string[] } }) {
-  return proxy(request, context.params.segments)
+export async function POST(request: NextRequest, context: { params: Promise<{ segments: string[] }> }) {
+  const params = await context.params
+  return proxy(request, params.segments)
 }
 
-export async function HEAD(request: NextRequest, context: { params: { segments: string[] } }) {
-  return proxy(request, context.params.segments)
+export async function HEAD(request: NextRequest, context: { params: Promise<{ segments: string[] }> }) {
+  const params = await context.params
+  return proxy(request, params.segments)
 }
 
 export async function PUT(request: NextRequest, context: { params: { segments: string[] } }) {
