@@ -88,9 +88,15 @@ export default function BiIntelligencePage() {
       console.log('Fetching metrics for run:', state.selectedRun);
       
       // Fetch available metrics sequentially to avoid overwhelming the server
-      setState(prev => ({ ...prev, loadingMessage: 'جاري تحميل بيانات الطلبات اليومية...' }));
-      const ordersDaily = await api.getBiMetric(state.selectedRun, 'orders_daily').catch((err) => {
-        console.error('Error fetching orders_daily:', err);
+      setState(prev => ({ ...prev, loadingMessage: 'جاري تحميل البيانات الإجمالية...' }));
+      const ordersTotal = await api.getBiMetric(state.selectedRun, 'orders_total').catch((err) => {
+        console.error('Error fetching orders_total:', err);
+        return null;
+      });
+
+      setState(prev => ({ ...prev, loadingMessage: 'جاري تحميل بيانات الطلبات حسب الوجهة...' }));
+      const ordersByDestination = await api.getBiMetric(state.selectedRun, 'orders_by_destination').catch((err) => {
+        console.error('Error fetching orders_by_destination:', err);
         return null;
       });
 
@@ -100,20 +106,34 @@ export default function BiIntelligencePage() {
         return null;
       });
 
-      setState(prev => ({ ...prev, loadingMessage: 'جاري تحميل بيانات معدل الدفع عند الاستلام...' }));
-      const codRateDaily = await api.getBiMetric(state.selectedRun, 'cod_rate_daily').catch((err) => {
-        console.error('Error fetching cod_rate_daily:', err);
+      setState(prev => ({ ...prev, loadingMessage: 'جاري تحميل بيانات توزيع طرق الدفع...' }));
+      const codDistribution = await api.getBiMetric(state.selectedRun, 'cod_rate_by_receiver_mode').catch((err) => {
+        console.error('Error fetching cod_rate_by_receiver_mode:', err);
         return null;
       });
 
-      console.log('Fetched metrics:', { ordersDaily: !!ordersDaily, avgCodAmount: !!avgCodAmount, codRateDaily: !!codRateDaily });
+      setState(prev => ({ ...prev, loadingMessage: 'جاري تحميل بيانات معدل الدفع عند الاستلام حسب المنطقة...' }));
+      const codRateByDestination = await api.getBiMetric(state.selectedRun, 'cod_rate_by_destination').catch((err) => {
+        console.error('Error fetching cod_rate_by_destination:', err);
+        return null;
+      });
+
+      console.log('Fetched metrics:', { 
+        ordersTotal: !!ordersTotal, 
+        ordersByDestination: !!ordersByDestination,
+        avgCodAmount: !!avgCodAmount, 
+        codDistribution: !!codDistribution,
+        codRateByDestination: !!codRateByDestination 
+      });
 
       setState(prev => ({
         ...prev,
         metrics: {
-          orders_daily: ordersDaily?.data || [],
+          orders_total: ordersTotal?.data || [],
+          orders_by_destination: ordersByDestination?.data || [],
           avg_cod_amount_destination: avgCodAmount?.data || [],
-          cod_rate_daily: codRateDaily?.data || []
+          cod_rate_by_receiver_mode: codDistribution?.data || [],
+          cod_rate_by_destination: codRateByDestination?.data || []
         },
         isLoading: false,
         loadingMessage: 'تم تحميل البيانات بنجاح'

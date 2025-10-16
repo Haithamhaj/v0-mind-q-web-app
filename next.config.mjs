@@ -13,7 +13,7 @@ const nextConfig = {
     return [
       {
         source: '/api/mindq/:path*',
-        destination: 'http://127.0.0.1:9001/:path*',
+        destination: 'http://127.0.0.1:9000/:path*',
       },
     ]
   },

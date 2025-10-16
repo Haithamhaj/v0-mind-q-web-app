@@ -42,8 +42,8 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
   }, [metrics, isLoading]);
 
   const initializeCharts = (data: any) => {
-    // Orders Daily Chart
-    if (ordersChartRef.current && data.orders_daily?.length > 0) {
+    // Orders by Destination Chart
+    if (ordersChartRef.current && data.orders_by_destination?.length > 0) {
       const chart = echarts.init(ordersChartRef.current);
       chart.setOption({
         tooltip: {
@@ -55,7 +55,7 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
         },
         xAxis: {
           type: 'category',
-          data: data.orders_daily.map((item: any) => item.date || item.dt),
+          data: data.orders_by_destination.map((item: any) => item.dt),
           axisLabel: { rotate: 45, fontSize: 10 }
         },
         yAxis: { 
@@ -64,23 +64,18 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
         },
         series: [{
           name: 'عدد الطلبات',
-          type: 'line',
-          data: data.orders_daily.map((item: any) => item.count || item.val),
-          smooth: true,
-          lineStyle: { width: 3 },
-          itemStyle: { color: '#3b82f6' },
-          areaStyle: { 
-            opacity: 0.3,
+          type: 'bar',
+          data: data.orders_by_destination.map((item: any) => item.val),
+          itemStyle: { 
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: '#3b82f6' },
-              { offset: 1, color: 'transparent' }
+              { offset: 1, color: '#1e40af' }
             ])
           },
-          markPoint: {
-            data: [
-              { type: 'max', name: 'أعلى قيمة' },
-              { type: 'min', name: 'أقل قيمة' }
-            ]
+          emphasis: {
+            itemStyle: {
+              color: '#2563eb'
+            }
           }
         }],
         grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
@@ -99,384 +94,337 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
           borderColor: '#333',
           textStyle: { color: '#fff' }
         },
-        xAxis: { type: 'value' },
-        yAxis: {
-          type: 'category',
-          data: data.avg_cod_amount_destination.map((item: any) => item.destination || item.dim),
-          axisLabel: { interval: 0, fontSize: 10 }
-        },
-        series: [{
-          name: 'متوسط المبلغ',
-          type: 'bar',
-          data: data.avg_cod_amount_destination.map((item: any) => item.avg_amount || item.val),
-          itemStyle: { 
-            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              { offset: 0, color: '#10b981' },
-              { offset: 1, color: '#34d399' }
-            ])
-          },
-          label: {
-            show: true,
-            position: 'right',
-            fontSize: 10
-          }
-        }],
-        grid: { left: '25%', right: '10%', bottom: '3%', top: '5%', containLabel: true },
-        animation: true,
-        animationDuration: 1200
-      });
-    }
-
-    // COD Rate Chart
-    if (codRateChartRef.current && data.cod_rate_daily?.length > 0) {
-      const chart = echarts.init(codRateChartRef.current);
-      chart.setOption({
-        tooltip: {
-          trigger: 'axis',
-          formatter: (params: any) => {
-            const value = (params[0].value * 100).toFixed(1);
-            return `${params[0].name}<br/>معدل COD: ${value}%`;
-          },
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          borderColor: '#333',
-          textStyle: { color: '#fff' }
-        },
         xAxis: {
           type: 'category',
-          data: data.cod_rate_daily.map((item: any) => item.date || item.dt),
-          axisLabel: { rotate: 45, fontSize: 10 }
-        },
-        yAxis: {
-          type: 'value',
-          axisLabel: { 
-            formatter: (value: number) => `${(value * 100).toFixed(0)}%`,
-            fontSize: 10
-          },
-          min: 0,
-          max: 1
-        },
-        series: [{
-          name: 'معدل COD',
-          type: 'bar',
-          data: data.cod_rate_daily.map((item: any) => item.rate || item.val),
-          itemStyle: { 
-            color: (params: any) => {
-              const value = params.value;
-              if (value > 0.7) return '#ef4444'; // أحمر للقيم العالية
-              if (value > 0.5) return '#f59e0b'; // برتقالي للقيم المتوسطة
-              return '#10b981'; // أخضر للقيم المنخفضة
-            }
-          },
-          label: {
-            show: true,
-            position: 'top',
-            formatter: (params: any) => `${(params.value * 100).toFixed(1)}%`,
-            fontSize: 9
-          }
-        }],
-        grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-        animation: true,
-        animationDuration: 800
-      });
-    }
-
-    // Trends Overview Chart
-    if (trendsChartRef.current && data.orders_daily?.length > 0) {
-      const chart = echarts.init(trendsChartRef.current);
-      const dates = data.orders_daily.map((item: any) => item.date || item.dt);
-      const orders = data.orders_daily.map((item: any) => item.count || item.val);
-      
-      chart.setOption({
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          borderColor: '#333',
-          textStyle: { color: '#fff' }
-        },
-        legend: {
-          data: ['الطلبات اليومية', 'المتوسط المتحرك'],
-          top: 10
-        },
-        xAxis: {
-          type: 'category',
-          data: dates,
+          data: data.avg_cod_amount_destination.map((item: any) => item.dt),
           axisLabel: { rotate: 45, fontSize: 10 }
         },
         yAxis: { 
           type: 'value',
           axisLabel: { fontSize: 10 }
         },
-        series: [
-          {
-            name: 'الطلبات اليومية',
-            type: 'bar',
-            data: orders,
-            itemStyle: { color: '#3b82f6', opacity: 0.7 }
-          },
-          {
-            name: 'المتوسط المتحرك',
-            type: 'line',
-            data: calculateMovingAverage(orders, 3),
-            smooth: true,
-            lineStyle: { width: 2, color: '#ef4444' },
-            symbol: 'circle',
-            symbolSize: 4
+        series: [{
+          name: 'متوسط مبلغ الدفع عند الاستلام',
+          type: 'bar',
+          data: data.avg_cod_amount_destination.map((item: any) => item.val),
+          itemStyle: { 
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#10b981' },
+              { offset: 1, color: '#059669' }
+            ])
           }
-        ],
-        grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
+        }],
+        grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+        animation: true,
+        animationDuration: 1200
+      });
+    }
+
+    // COD Rate Chart (COD vs CC Distribution)
+    if (codRateChartRef.current && data.cod_rate_by_receiver_mode?.length > 0) {
+      const chart = echarts.init(codRateChartRef.current);
+      chart.setOption({
+        tooltip: {
+          trigger: 'item',
+          formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        legend: {
+          orient: 'vertical',
+          left: 'left',
+          textStyle: { fontSize: 10 }
+        },
+        series: [{
+          name: 'طريقة الدفع',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          avoidLabelOverlap: false,
+          data: data.cod_rate_by_receiver_mode.map((item: any) => ({
+            value: item.val,
+            name: item.dt === 'COD' ? 'الدفع عند الاستلام' : 'الدفع بالبطاقة'
+          })),
+          itemStyle: {
+            borderRadius: 10,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: '20',
+              fontWeight: 'bold'
+            }
+          },
+          labelLine: {
+            show: false
+          }
+        }],
+        color: ['#f59e0b', '#3b82f6'],
         animation: true,
         animationDuration: 1500
       });
     }
-  };
 
-  const calculateMovingAverage = (data: number[], window: number) => {
-    const result = [];
-    for (let i = 0; i < data.length; i++) {
-      if (i < window - 1) {
-        result.push(null);
-      } else {
-        const sum = data.slice(i - window + 1, i + 1).reduce((a, b) => a + b, 0);
-        result.push(sum / window);
-      }
+    // COD Rate by Destination Trends
+    if (trendsChartRef.current && data.cod_rate_by_destination?.length > 0) {
+      const chart = echarts.init(trendsChartRef.current);
+      chart.setOption({
+        tooltip: {
+          trigger: 'axis',
+          formatter: function(params: any) {
+            return `${params[0].name}<br/>معدل الدفع عند الاستلام: ${(params[0].value * 100).toFixed(1)}%`;
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: data.cod_rate_by_destination.map((item: any) => item.dt),
+          axisLabel: { rotate: 45, fontSize: 10 }
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: { 
+            fontSize: 10,
+            formatter: function(value: number) {
+              return (value * 100).toFixed(0) + '%';
+            }
+          }
+        },
+        series: [{
+          name: 'معدل الدفع عند الاستلام',
+          type: 'line',
+          data: data.cod_rate_by_destination.map((item: any) => item.val),
+          smooth: true,
+          lineStyle: { width: 3, color: '#8b5cf6' },
+          itemStyle: { color: '#8b5cf6' },
+          areaStyle: {
+            opacity: 0.3,
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#8b5cf6' },
+              { offset: 1, color: 'transparent' }
+            ])
+          }
+        }],
+        grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+        animation: true,
+        animationDuration: 1000
+      });
     }
-    return result;
   };
 
-  const calculateKPIs = () => {
-    if (!metrics || !metrics.orders_daily) return null;
+  // Calculate metrics with corrected data
+  const totalOrders = metrics.orders_total && metrics.orders_total.length > 0 
+    ? metrics.orders_total[0].val 
+    : 0;
 
-    const totalOrders = metrics.orders_daily.reduce((sum: number, item: any) => sum + (item.count || item.val || 0), 0);
-    const avgDailyOrders = Math.round(totalOrders / metrics.orders_daily.length);
-    
-    const avgCodRate = metrics.cod_rate_daily?.length > 0 
-      ? (metrics.cod_rate_daily.reduce((sum: number, item: any) => sum + (item.rate || item.val || 0), 0) / metrics.cod_rate_daily.length * 100)
-      : 0;
-    
-    const topDestination = metrics.avg_cod_amount_destination?.length > 0 
-      ? metrics.avg_cod_amount_destination.reduce((prev: any, current: any) => 
-          (prev.avg_amount || prev.val || 0) > (current.avg_amount || current.val || 0) ? prev : current
-        )
-      : null;
+  const totalDestinations = metrics.orders_by_destination ? metrics.orders_by_destination.length : 0;
 
-    // Calculate trends
-    const recentOrders = metrics.orders_daily.slice(-7);
-    const previousOrders = metrics.orders_daily.slice(-14, -7);
-    const recentAvg = recentOrders.length > 0 ? recentOrders.reduce((sum: number, item: any) => sum + (item.count || item.val || 0), 0) / recentOrders.length : 0;
-    const previousAvg = previousOrders.length > 0 ? previousOrders.reduce((sum: number, item: any) => sum + (item.count || item.val || 0), 0) / previousOrders.length : 0;
-    const trendPercentage = previousAvg > 0 ? ((recentAvg - previousAvg) / previousAvg * 100) : 0;
+  const codOrders = metrics.cod_rate_by_receiver_mode?.find((item: any) => item.dt === 'COD')?.val || 0;
+  const ccOrders = metrics.cod_rate_by_receiver_mode?.find((item: any) => item.dt === 'CC')?.val || 0;
+  const codRate = totalOrders > 0 ? (codOrders / totalOrders * 100) : 0;
 
-    return {
-      totalOrders,
-      avgDailyOrders,
-      avgCodRate: avgCodRate.toFixed(1),
-      topDestination: topDestination ? (topDestination.destination || topDestination.dim) : 'غير متوفر',
-      topDestinationAmount: topDestination ? (topDestination.avg_amount || topDestination.val || 0).toFixed(2) : '0',
-      trendPercentage: trendPercentage.toFixed(1),
-      isPositiveTrend: trendPercentage > 0
-    };
-  };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-muted rounded w-1/2 mb-2"></div>
-                <div className="h-3 bg-muted rounded w-2/3"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className="text-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">جاري تحليل البيانات...</p>
-        </div>
-      </div>
-    );
-  }
+  const topDestination = metrics.orders_by_destination && metrics.orders_by_destination.length > 0 
+    ? metrics.orders_by_destination[0] 
+    : null;
 
   if (!metrics || Object.keys(metrics).length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">لا توجد بيانات متاحة</h3>
-          <p className="text-muted-foreground">يرجى التأكد من أن الخادم يعمل وأن هناك بيانات متاحة للعرض</p>
-          <p className="text-sm text-muted-foreground mt-2">أو اختيار تشغيل صحيح من القائمة أعلاه</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <h1 className="text-3xl font-bold text-gray-900">
+                جاري تحميل لوحة المعلومات التجارية
+              </h1>
+            </div>
+            <p className="mt-2 text-gray-600">
+              نقوم بمعالجة البيانات وإعداد التقارير المتقدمة...
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
-  const kpis = calculateKPIs();
-
   return (
-    <div className="p-6 space-y-6 h-full overflow-auto">
-      {/* KPI Cards */}
-      {kpis && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="hover:shadow-lg transition-all duration-300 border-primary/20 bg-gradient-to-br from-card to-primary/5">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <h1 className="mb-4 text-4xl font-bold text-gray-900">
+            🎯 لوحة المعلومات التجارية الذكية
+          </h1>
+          <p className="text-lg text-gray-600">
+            تحليل شامل للبيانات مع رؤى ذكية ومؤشرات الأداء الرئيسية
+          </p>
+          <Badge variant="outline" className="mt-2 bg-blue-50 text-blue-700">
+            <Activity className="mr-1 h-4 w-4" />
+            معرف التشغيل: {runId}
+          </Badge>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">إجمالي الطلبات</CardTitle>
-              <Package className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-blue-900">إجمالي الطلبات</CardTitle>
+              <Package className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpis.totalOrders.toLocaleString()}</div>
-              <div className="flex items-center text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3 mr-1" />
-                للفترة المحددة
-              </div>
+              <div className="text-2xl font-bold text-blue-900">{totalOrders.toLocaleString()}</div>
+              <p className="text-xs text-blue-700">
+                <ArrowUpRight className="inline h-3 w-3" />
+                العدد الإجمالي للطلبات المسجلة
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-secondary/20 bg-gradient-to-br from-card to-secondary/5">
+          <Card className="border-0 bg-gradient-to-br from-emerald-50 to-emerald-100 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">متوسط الطلبات اليومية</CardTitle>
-              <TrendingUp className="h-4 w-4 text-secondary" />
+              <CardTitle className="text-sm font-medium text-emerald-900">معدل الدفع عند الاستلام</CardTitle>
+              <DollarSign className="h-4 w-4 text-emerald-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpis.avgDailyOrders}</div>
-              <div className="flex items-center text-xs">
-                {kpis.isPositiveTrend ? (
-                  <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-                ) : (
-                  <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                )}
-                <span className={kpis.isPositiveTrend ? 'text-green-500' : 'text-red-500'}>
-                  {Math.abs(parseFloat(kpis.trendPercentage))}%
-                </span>
-                <span className="text-muted-foreground mr-1">عن الأسبوع الماضي</span>
-              </div>
+              <div className="text-2xl font-bold text-emerald-900">{codRate.toFixed(1)}%</div>
+              <p className="text-xs text-emerald-700">
+                {codOrders.toLocaleString()} من أصل {totalOrders.toLocaleString()} طلب
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-orange-500/20 bg-gradient-to-br from-card to-orange-500/5">
+          <Card className="border-0 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">معدل الدفع عند التسليم</CardTitle>
-              <DollarSign className="h-4 w-4 text-orange-500" />
+              <CardTitle className="text-sm font-medium text-purple-900">عدد الوجهات</CardTitle>
+              <MapPin className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpis.avgCodRate}%</div>
-              <div className="flex items-center text-xs text-muted-foreground">
-                <Activity className="h-3 w-3 mr-1" />
-                من إجمالي الطلبات
-              </div>
+              <div className="text-2xl font-bold text-purple-900">{totalDestinations}</div>
+              <p className="text-xs text-purple-700">
+                المناطق الجغرافية المختلفة
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-all duration-300 border-purple-500/20 bg-gradient-to-br from-card to-purple-500/5">
+          <Card className="border-0 bg-gradient-to-br from-amber-50 to-amber-100 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">أعلى وجهة</CardTitle>
-              <MapPin className="h-4 w-4 text-purple-500" />
+              <CardTitle className="text-sm font-medium text-amber-900">أكبر وجهة</CardTitle>
+              <TrendingUp className="h-4 w-4 text-amber-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold truncate">{kpis.topDestination}</div>
-              <div className="flex items-center text-xs text-muted-foreground">
-                <DollarSign className="h-3 w-3 mr-1" />
-                {kpis.topDestinationAmount} ر.س
+              <div className="text-2xl font-bold text-amber-900">
+                {topDestination?.dt || 'غير محدد'}
               </div>
+              <p className="text-xs text-amber-700">
+                {topDestination?.val?.toLocaleString() || 0} طلب
+              </p>
             </CardContent>
           </Card>
         </div>
-      )}
 
-      {/* Charts */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
-          <TabsTrigger value="trends">الاتجاهات</TabsTrigger>
-          <TabsTrigger value="performance">الأداء</TabsTrigger>
-          <TabsTrigger value="geography">الجغرافيا</TabsTrigger>
-        </TabsList>
+        {/* Charts Section */}
+        <Tabs defaultValue="geographic" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 bg-white shadow-sm">
+            <TabsTrigger value="geographic" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              التوزيع الجغرافي
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="flex items-center gap-2">
+              <PieChart className="h-4 w-4" />
+              طرق الدفع
+            </TabsTrigger>
+            <TabsTrigger value="amounts" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              المبالغ
+            </TabsTrigger>
+            <TabsTrigger value="trends" className="flex items-center gap-2">
+              <LineChart className="h-4 w-4" />
+              الاتجاهات
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="hover:shadow-lg transition-shadow">
+          <TabsContent value="geographic">
+            <Card className="border-0 shadow-xl">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <LineChart className="h-5 w-5 text-primary" />
-                    اتجاه الطلبات اليومية
-                  </CardTitle>
-                  <Badge variant="secondary">Live</Badge>
-                </div>
-                <CardDescription>تتبع كمية الطلبات عبر الزمن</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                  توزيع الطلبات حسب الوجهة الجغرافية
+                </CardTitle>
+                <CardDescription>
+                  عرض توزيع الطلبات على المناطق المختلفة في المملكة العربية السعودية
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div ref={ordersChartRef} style={{ width: '100%', height: '300px' }}></div>
+                <div ref={ordersChartRef} className="h-96 w-full" />
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <Card className="hover:shadow-lg transition-shadow">
+          <TabsContent value="payment">
+            <Card className="border-0 shadow-xl">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-orange-500" />
-                    معدل الدفع عند التسليم
-                  </CardTitle>
-                  <Badge variant="outline">يومي</Badge>
-                </div>
-                <CardDescription>نسبة الطلبات المدفوعة عند التسليم</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-emerald-600" />
+                  توزيع طرق الدفع
+                </CardTitle>
+                <CardDescription>
+                  مقارنة بين الدفع عند الاستلام والدفع بالبطاقة الائتمانية
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div ref={codRateChartRef} style={{ width: '100%', height: '300px' }}></div>
+                <div ref={codRateChartRef} className="h-96 w-full" />
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        <TabsContent value="trends" className="space-y-6">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-secondary" />
-                تحليل الاتجاهات المتقدم
-              </CardTitle>
-              <CardDescription>الطلبات اليومية مع المتوسط المتحرك</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div ref={trendsChartRef} style={{ width: '100%', height: '400px' }}></div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="amounts">
+            <Card className="border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-green-600" />
+                  متوسط مبالغ الدفع عند الاستلام حسب الوجهة
+                </CardTitle>
+                <CardDescription>
+                  تحليل متوسط المبالغ المدفوعة عند الاستلام في كل منطقة
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div ref={codAmountChartRef} className="h-96 w-full" />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-green-500" />
-                مؤشرات الأداء الرئيسية
-              </CardTitle>
-              <CardDescription>تحليل شامل للأداء والكفاءة</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <BarChart3 className="h-12 w-12 mx-auto mb-4" />
-                <p>سيتم إضافة مؤشرات أداء إضافية قريباً</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="trends">
+            <Card className="border-0 shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LineChart className="h-5 w-5 text-purple-600" />
+                  معدل الدفع عند الاستلام حسب المنطقة
+                </CardTitle>
+                <CardDescription>
+                  تحليل اتجاهات استخدام الدفع عند الاستلام في المناطق المختلفة
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div ref={trendsChartRef} className="h-96 w-full" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-        <TabsContent value="geography" className="space-y-6">
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-purple-500" />
-                التوزيع الجغرافي
-              </CardTitle>
-              <CardDescription>متوسط مبلغ الدفع عند التسليم حسب الوجهة</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div ref={codAmountChartRef} style={{ width: '100%', height: '500px' }}></div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <Button variant="outline" size="sm" className="mx-2">
+            <Calendar className="mr-2 h-4 w-4" />
+            تحديث البيانات
+          </Button>
+          <Button variant="outline" size="sm" className="mx-2">
+            📊 تصدير التقرير
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
