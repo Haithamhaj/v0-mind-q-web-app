@@ -2,52 +2,222 @@
 > my-v0-project@0.1.0 dev
 > next dev
 
-   Γû▓ Next.js 15.2.4
+   ▲ Next.js 15.2.4
    - Local:        http://localhost:3000
    - Network:      http://172.26.128.1:3000
 
- Γ£ô Starting...
- Γ£ô Ready in 7.3s
- Γùï Compiling /results ...
- Γ£ô Compiled /results in 16.5s (2064 modules)
- GET /results 200 in 142ms
- Γùï Compiling / ...
- Γ£ô Compiled / in 14.1s (1488 modules)
- GET / 200 in 17268ms
- Γùï Compiling /api/mindq/[...segments] ...
- Γ£ô Compiled /api/mindq/[...segments] in 7.4s (1520 modules)
- GET / 200 in 3637ms
- Γùï Compiling /pipeline ...
- GET /api/mindq/healthz 200 in 16110ms
- Γ£ô Compiled /pipeline in 16.4s (1560 modules)
- GET /pipeline 200 in 14780ms
- GET /pipeline 200 in 79ms
- Γùï Compiling /api/uploads ...
- Γ£ô Compiled /api/uploads in 1221ms (1564 modules)
- POST /api/uploads 200 in 1754ms
- Γùï Compiling /results ...
- Γ£ô Compiled /results in 6s (1127 modules)
- POST /api/mindq/v1/runs/run-20251015224358/pipeline/full 200 in 23741ms
- GET /results 200 in 11149ms
- GET /api/mindq/v1/runs 404 in 1104ms
- GET /results 200 in 474ms
- GET /api/mindq/v1/runs 404 in 2169ms
- GET /results 200 in 268ms
- GET /api/mindq/v1/runs 200 in 1390ms
- GET /api/mindq/v1/runs 200 in 1867ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 3046ms
- GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 9780ms
- GET /api/mindq/v1/bi/run-20251015224358/metrics/orders_daily 200 in 1543ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 2321ms
- GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 3035ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_5_feature_report%2Freport.md 200 in 896ms
- POST /api/mindq/v1/runs/run-20251015224358/pipeline/full 200 in 30062ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_5_feature_report%2Freport.md 200 in 1145ms
- GET /api/mindq/v1/bi/run-20251015224358/metrics/avg_cod_amount_destination 200 in 1681ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 2206ms
- GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 2217ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_readiness%2Fredundancy.json 200 in 979ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_readiness%2Frow_meta.json 200 in 901ms
- GET /api/mindq/v1/bi/run-20251015224358/metrics/cod_rate_daily 200 in 1477ms
- GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 1971ms
- GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 2389ms
+ ✓ Starting...
+ ✓ Ready in 4.5s
+ ○ Compiling / ...
+ ✓ Compiled / in 6.1s (922 modules)
+ GET / 200 in 8329ms
+ GET / 200 in 308ms
+ GET / 200 in 203ms
+(node:3436) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ○ Compiling /pipeline ...
+ ✓ Compiled /pipeline in 2.8s (977 modules)
+ GET /pipeline 200 in 3243ms
+ ○ Compiling /bi-intelligence ...
+ ✓ Compiled /bi-intelligence in 26.5s (2206 modules)
+ GET /bi-intelligence 200 in 4521ms
+ GET /bi-intelligence 200 in 27468ms
+ GET /bi-intelligence 200 in 1127ms
+ GET /bi-intelligence 200 in 142ms
+ ✓ Compiled in 1734ms (1064 modules)
+ GET /bi-intelligence 200 in 249ms
+ GET /bi-intelligence 200 in 108ms
+ GET /bi-intelligence 200 in 49ms
+ GET / 200 in 829ms
+ GET /bi-intelligence 200 in 48ms
+ GET /bi-intelligence 200 in 1752ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 2.9s (2206 modules)
+ GET /bi-intelligence 200 in 3192ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1993ms (2206 modules)
+ GET /bi-intelligence 200 in 2049ms
+ ✓ Compiled in 1462ms (2206 modules)
+ GET /bi-intelligence 200 in 768ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1597ms (2206 modules)
+ GET /bi-intelligence 200 in 1142ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 1407ms (2206 modules)
+ GET /bi-intelligence 200 in 151ms
+ ✓ Compiled in 2.6s (2206 modules)
+ GET /bi-intelligence 200 in 343ms
+ GET /bi-intelligence 200 in 1713ms
+ ✓ Compiled in 4.2s (2206 modules)
+ GET /bi-intelligence 200 in 402ms
+ ✓ Compiled in 1652ms (2206 modules)
+ GET /bi-intelligence 200 in 218ms
+ ✓ Compiled in 2.9s (2206 modules)
+ GET /bi-intelligence 200 in 353ms
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected '}', got '<eof>'
+     ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:467:1]
+ [2m464[0m |       </div>
+ [2m465[0m |     </div>
+ [2m466[0m |   );
+ [2m467[0m | }
+     : [35;1m^[0m
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ✓ Compiled in 4s (2206 modules)
+ GET /bi-intelligence 200 in 382ms
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+     ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:105:1]
+ [2m 99[0m |         chart.resize();
+ [2m100[0m |         chartInstances.push(chart);
+ [2m101[0m |       }
+ [2m102[0m |     };
+     : [35;1m     ^[0m
+ [2m103[0m | 
+ [2m104[0m |     window.addEventListener('resize', handleResize);
+ [2m104[0m | 
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+     ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:209:1]
+ [2m203[0m | 
+ [2m204[0m |       }
+ [2m205[0m | 
+ [2m206[0m |     };
+     : [35;1m     ^[0m
+ [2m207[0m | 
+ [2m208[0m | 
+ [2m208[0m | 
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+     ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:417:1]
+ [2m411[0m | 
+ [2m412[0m | 
+ [2m413[0m | 
+ [2m414[0m |     };
+     : [35;1m     ^[0m
+ [2m415[0m | 
+ [2m416[0m | 
+ [2m416[0m | 
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+     ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:833:1]
+ [2m827[0m | 
+ [2m828[0m | 
+ [2m829[0m | 
+ [2m830[0m |     };
+     : [35;1m     ^[0m
+ [2m831[0m | 
+ [2m832[0m | 
+ [2m832[0m | 
+     `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+      ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:1665:1]
+ [2m1659[0m | 
+ [2m1660[0m | 
+ [2m1661[0m | 
+ [2m1662[0m |     };
+      : [35;1m     ^[0m
+ [2m1663[0m | 
+ [2m1664[0m | 
+ [2m1664[0m | 
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+    ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:93:1]
+ [2m90[0m | 
+ [2m91[0m |       }
+ [2m92[0m | 
+ [2m93[0m |     };
+    : [35;1m     ^[0m
+ [2m94[0m | 
+ [2m95[0m |     window.addEventListener('resize', handleResize);
+ [2m95[0m | 
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ ○ Compiling /_error ...
+ ⨯ ./components/BI/BiDashboard.tsx
+Error:   [31mx[0m Expected ',', got ';'
+    ,-[[36;1;4mC:\Github - MindQ\Mind-Q-V4-BI\frontend\components\BI\BiDashboard.tsx[0m:93:1]
+ [2m90[0m | 
+ [2m91[0m |       }
+ [2m92[0m | 
+ [2m93[0m |     };
+    : [35;1m     ^[0m
+ [2m94[0m | 
+ [2m95[0m |     window.addEventListener('resize', handleResize);
+ [2m95[0m | 
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./components/BI/BiDashboard.tsx
+./app/bi-intelligence/page.tsx
+ GET /bi-intelligence 500 in 8927ms
+ GET /bi-intelligence 500 in 5192ms
+ GET /bi-intelligence 500 in 93ms
+ GET /bi-intelligence 500 in 89ms
+ GET /bi-intelligence 500 in 47ms
+ ✓ Compiled /_error in 12.3s (2542 modules)
+ ○ Compiling /_not-found ...
+ GET /bi-intelligence 200 in 3893ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled /_not-found in 5.4s (2532 modules)
+ ✓ Compiled in 2.5s (2546 modules)
+ GET /bi-intelligence 200 in 188ms
+ GET /bi-intelligence 200 in 1547ms
+ GET /bi-intelligence 200 in 277ms
+ GET /bi-intelligence 200 in 1244ms
