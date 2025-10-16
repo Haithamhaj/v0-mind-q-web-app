@@ -1,0 +1,53 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+   Γû▓ Next.js 15.2.4
+   - Local:        http://localhost:3000
+   - Network:      http://172.26.128.1:3000
+
+ Γ£ô Starting...
+ Γ£ô Ready in 7.3s
+ Γùï Compiling /results ...
+ Γ£ô Compiled /results in 16.5s (2064 modules)
+ GET /results 200 in 142ms
+ Γùï Compiling / ...
+ Γ£ô Compiled / in 14.1s (1488 modules)
+ GET / 200 in 17268ms
+ Γùï Compiling /api/mindq/[...segments] ...
+ Γ£ô Compiled /api/mindq/[...segments] in 7.4s (1520 modules)
+ GET / 200 in 3637ms
+ Γùï Compiling /pipeline ...
+ GET /api/mindq/healthz 200 in 16110ms
+ Γ£ô Compiled /pipeline in 16.4s (1560 modules)
+ GET /pipeline 200 in 14780ms
+ GET /pipeline 200 in 79ms
+ Γùï Compiling /api/uploads ...
+ Γ£ô Compiled /api/uploads in 1221ms (1564 modules)
+ POST /api/uploads 200 in 1754ms
+ Γùï Compiling /results ...
+ Γ£ô Compiled /results in 6s (1127 modules)
+ POST /api/mindq/v1/runs/run-20251015224358/pipeline/full 200 in 23741ms
+ GET /results 200 in 11149ms
+ GET /api/mindq/v1/runs 404 in 1104ms
+ GET /results 200 in 474ms
+ GET /api/mindq/v1/runs 404 in 2169ms
+ GET /results 200 in 268ms
+ GET /api/mindq/v1/runs 200 in 1390ms
+ GET /api/mindq/v1/runs 200 in 1867ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 3046ms
+ GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 9780ms
+ GET /api/mindq/v1/bi/run-20251015224358/metrics/orders_daily 200 in 1543ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 2321ms
+ GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 3035ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_5_feature_report%2Freport.md 200 in 896ms
+ POST /api/mindq/v1/runs/run-20251015224358/pipeline/full 200 in 30062ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_5_feature_report%2Freport.md 200 in 1145ms
+ GET /api/mindq/v1/bi/run-20251015224358/metrics/avg_cod_amount_destination 200 in 1681ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 2206ms
+ GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 2217ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_readiness%2Fredundancy.json 200 in 979ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts/content?path=run-20251015224358%2Fstage_07_readiness%2Frow_meta.json 200 in 901ms
+ GET /api/mindq/v1/bi/run-20251015224358/metrics/cod_rate_daily 200 in 1477ms
+ GET /api/mindq/v1/runs/run-20251015224358/artifacts 200 in 1971ms
+ GET /api/mindq/v1/bi/run-20251015224358/meta 200 in 2389ms
