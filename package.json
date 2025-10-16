@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "python -m bi.reconcile.run artifacts/p09.parquet artifacts/p10.parquet bi/semantic/metrics.yml",
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
