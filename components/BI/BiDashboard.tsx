@@ -50,9 +50,11 @@ interface BiDashboardProps {
 
   isLoading: boolean;
 
+  showHero?: boolean;
+
 }
 
-export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
+export function BiDashboard({ runId, metrics, isLoading, showHero = true }: BiDashboardProps) {
 
   const ordersChartRef = useRef<HTMLDivElement>(null);
 
@@ -329,6 +331,8 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
       
       <div className="relative z-10 mx-auto max-w-7xl p-6">
 
+        {showHero && (
+          <>
         {/* Modern Header with Glass Effect */}
         <div className="mb-12 text-center relative">
           <div className="absolute inset-0 bg-white/10 backdrop-blur-lg rounded-3xl border border-white/20 shadow-2xl"></div>
@@ -422,7 +426,8 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
           </Card>
 
         </div>
-
+          </>
+        )}
         {/* Modern Charts Section with Futuristic Tabs */}
         <Tabs defaultValue="geographic" className="space-y-8">
           

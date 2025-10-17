@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,9 @@ import {
   RefreshCw,
   TrendingUp,
 } from "lucide-react";
+
 import { api, PipelineRunInfo } from "@/lib/api";
+import { BiDashboard } from "@/components/BI/BiDashboard";
 import { BiDataProvider, useBiDataContext } from "../data/provider";
 import { formatCurrency, formatNumber, formatPercentage, useKpiCalculations } from "../data/kpi-calculations";
 
@@ -30,11 +33,9 @@ interface StoryBIDashboardProps {
 }
 
 const formatRunTimestamp = (iso?: string): string | undefined => {
-  if (!iso) {
-    return undefined;
-  }
+  if (!iso) return undefined;
   try {
-    return new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat("ar-SA", {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(iso));
@@ -46,15 +47,92 @@ const formatRunTimestamp = (iso?: string): string | undefined => {
 const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
   const { dataset, loading, error } = useBiDataContext();
   const kpis = useKpiCalculations(dataset);
-  const formattedCount = useMemo(() => dataset.length.toLocaleString("en-US"), [dataset.length]);
+
+  const formattedCount = useMemo(() => dataset.length.toLocaleString("ar-SA"), [dataset.length]);
   const formattedUpdatedAt = formatRunTimestamp(runInfo?.updatedAt);
+
+  const chartMetrics = useMemo(() => {
+    if (!dataset || dataset.length === 0) {
+      return null;
+    }
+
+    const destinationStats = new Map<string, { count: number; codCount: number; codAmount: number }>();
+    const paymentStats = new Map<string, number>();
+
+    dataset.forEach((row) => {
+      const destination =
+        String((row as any)?.destination ?? (row as any)?.DESTINATION ?? "غير محدد") || "غير محدد";
+      const rawPayment = String(
+        (row as any)?.payment_method ??
+          (row as any)?.paymentMethod ??
+          (row as any)?.["RECEIVER MODE"] ??
+          (row as any)?.["RECEIVER_MODE"] ??
+          "",
+      ).toUpperCase();
+      const payment =
+        rawPayment.includes("COD") ? "COD" : rawPayment.includes("CARD") ? "CC" : rawPayment || "OTHER";
+
+      const amount = Number(
+        (row as any)?.amount ??
+          (row as any)?.AMOUNT ??
+          (row as any)?.Shipment_Value ??
+          (row as any)?.SHIPMENT_VALUE ??
+          0,
+      );
+      const codAmount = Number((row as any)?.cod_amount ?? (row as any)?.COD_AMOUNT ?? amount ?? 0);
+
+      const stats = destinationStats.get(destination) ?? { count: 0, codCount: 0, codAmount: 0 };
+      stats.count += 1;
+      if (payment === "COD") {
+        stats.codCount += 1;
+        stats.codAmount += codAmount;
+      }
+      destinationStats.set(destination, stats);
+
+      paymentStats.set(payment, (paymentStats.get(payment) ?? 0) + 1);
+    });
+
+    const totalOrders = dataset.length;
+
+    const ordersByDestination = [...destinationStats.entries()]
+      .map(([dt, stats]) => ({ dt, val: stats.count }))
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 10);
+
+    const avgCodAmountDestination = [...destinationStats.entries()]
+      .map(([dt, stats]) => ({
+        dt,
+        val: stats.codCount > 0 ? stats.codAmount / stats.codCount : 0,
+      }))
+      .filter((item) => item.val > 0)
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 10);
+
+    const codRateByDestination = [...destinationStats.entries()]
+      .map(([dt, stats]) => ({
+        dt,
+        val: stats.count > 0 ? Number(((stats.codCount / stats.count) * 100).toFixed(2)) : 0,
+      }))
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 10);
+
+    const codRateByReceiverMode = [...paymentStats.entries()].map(([dt, val]) => ({ dt, val }));
+
+    return {
+      orders_total: [{ dt: "total", val: totalOrders }],
+      orders_by_destination: ordersByDestination,
+      avg_cod_amount_destination: avgCodAmountDestination,
+      cod_rate_by_receiver_mode: codRateByReceiverMode,
+      cod_rate_by_destination: codRateByDestination,
+    };
+  }, [dataset]);
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
           <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground">Loading BI data…</p>
+          <p className="text-muted-foreground">جارٍ تحميل بيانات لوحة BI…</p>
         </div>
       </div>
     );
@@ -62,10 +140,10 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
 
   if (error) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <h3 className="mb-2 text-lg font-semibold">Unable to load operational data</h3>
+          <h3 className="mb-2 text-lg font-semibold">تعذّر تحميل البيانات التشغيلية</h3>
           <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
@@ -74,25 +152,23 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
 
   if (dataset.length === 0) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <h3 className="mb-2 text-lg font-semibold">No records available</h3>
-          <p className="text-muted-foreground">
-            Run phase 10 or pick another run to explore its BI output.
-          </p>
+          <h3 className="mb-2 text-lg font-semibold">لا توجد بيانات متاحة</h3>
+          <p className="text-muted-foreground">قم بتشغيل المرحلة العاشرة أو اختر تشغيلًا آخر.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6" dir="rtl">
+    <div className="space-y-6" dir="rtl">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">لوحة المعلومات التجارية الذكية</h1>
           <p className="text-muted-foreground">
-            مؤشرات محدثة لحركة الطلبات، الدفع عند الاستلام، والبصمة التشغيلية لكل تشغيل.
+            نظرة فورية على الطلبات، الدفع عند الاستلام، والبصمة التشغيلية لكل تشغيل.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -123,7 +199,7 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
             <div className="text-2xl font-bold">{formatNumber(kpis.totalOrders)}</div>
             <div className="flex items-center text-xs text-muted-foreground">
               <TrendingUp className="mr-1 h-3 w-3" />
-              مقارنةً بالفترة السابقة
+              إجمالي الطلبات في الفترة الحالية
             </div>
           </CardContent>
         </Card>
@@ -196,6 +272,17 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
           </div>
         </CardContent>
       </Card>
+
+      {chartMetrics && (
+        <div className="mt-12">
+          <BiDashboard
+            runId={runInfo?.runId ?? ""}
+            metrics={chartMetrics}
+            isLoading={loading}
+            showHero={false}
+          />
+        </div>
+      )}
     </div>
   );
 };
@@ -217,13 +304,12 @@ const StoryBIPage: React.FC = () => {
   const [refreshToken, setRefreshToken] = useState<number>(0);
 
   useEffect(() => {
-    let isMounted = true;
-
+    let mounted = true;
     const loadRuns = async () => {
       setRunsLoading(true);
       try {
         const response = await api.listRuns();
-        if (!isMounted) {
+        if (!mounted) {
           return;
         }
         setRuns(response.runs);
@@ -236,13 +322,13 @@ const StoryBIPage: React.FC = () => {
         });
       } catch (err) {
         console.error("[story-bi] failed to load run list", err);
-        if (!isMounted) {
+        if (!mounted) {
           return;
         }
-        setRunsError("Failed to load run list. Falling back to run-latest.");
+        setRunsError("تعذّر تحميل قائمة التشغيلات. سيتم استخدام run-latest.");
         setSelectedRun((prev) => prev ?? "run-latest");
       } finally {
-        if (isMounted) {
+        if (mounted) {
           setRunsLoading(false);
         }
       }
@@ -251,7 +337,7 @@ const StoryBIPage: React.FC = () => {
     loadRuns();
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, []);
 
@@ -290,7 +376,7 @@ const StoryBIPage: React.FC = () => {
                 <SelectContent>
                   {runsLoading && (
                     <SelectItem value={runId} disabled>
-                      جارٍ تحميل قائمة التشغيلات...
+                      جارٍ تحميل التشغيلات…
                     </SelectItem>
                   )}
                   {runs.map((run) => (
