@@ -1,4 +1,4 @@
-;("use client");
+"use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
@@ -49,6 +49,31 @@ const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> =
   }
 };
 
+const fetchDataset = async (url: string | undefined, fallback: BiDatasetRow[]): Promise<BiDatasetRow[]> => {
+  if (!url) {
+    return fallback;
+  }
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    const data = await response.json();
+    // Handle the specific structure returned by the API
+    if (data && data.rows && Array.isArray(data.rows)) {
+      return data.rows as BiDatasetRow[];
+    }
+    // If it's already an array, return it
+    if (Array.isArray(data)) {
+      return data as BiDatasetRow[];
+    }
+    throw new Error("Invalid dataset format received from API");
+  } catch (error) {
+    console.warn("[story-bi] falling back for dataset", url, error);
+    return fallback;
+  }
+};
+
 export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoints }) => {
   const mergedEndpoints = { ...buildDefaultEndpoints(), ...endpoints };
 
@@ -74,7 +99,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
           fetchJson<MetricSpec[]>(mergedEndpoints.metrics, fallbackMetrics),
           fetchJson<DimensionsCatalog>(mergedEndpoints.dimensions, fallbackDimensions),
           fetchJson<Insight[]>(mergedEndpoints.insights, fallbackInsights),
-          fetchJson<BiDatasetRow[]>(mergedEndpoints.dataset, fallbackDataset),
+          fetchDataset(mergedEndpoints.dataset, fallbackDataset),
         ]);
 
         if (!active) return;

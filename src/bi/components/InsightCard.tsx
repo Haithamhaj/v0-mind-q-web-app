@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import * as React from 'react';
 import clsx from 'clsx';
 
 type Driver = {
@@ -50,7 +50,7 @@ export const InsightCard: React.FC<InsightCardProps> = ({
           <span className='mb-2 block text-xs font-medium text-muted-foreground'>Key drivers</span>
           <ul className='flex flex-col gap-2 text-sm'>
             {drivers.map((driver, index) => (
-              <li key={${driver.dimension}--} className='flex items-center justify-between gap-3'>
+              <li key={`${driver.dimension}-${index}`} className='flex items-center justify-between gap-3'>
                 <span className='truncate font-medium'>{driver.dimension}</span>
                 <span className='truncate text-sm text-muted-foreground'>{driver.value}</span>
                 {typeof driver.impact === 'number' && !Number.isNaN(driver.impact) && (
