@@ -13,7 +13,7 @@ type BiDataProviderProps = {
   endpoints?: EndpointOverrides;
 };
 
-const MAX_ROWS = 10_000;
+const MAX_ROWS = 25_000;
 const DEFAULT_BASE = process.env.NEXT_PUBLIC_BI_BASE ?? "/api/bi";
 const DEFAULT_RUN = process.env.NEXT_PUBLIC_BI_RUN ?? "run-latest";
 
@@ -30,7 +30,7 @@ const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
   metrics: `${DEFAULT_BASE}/metrics`,
   dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(DEFAULT_RUN)}`,
   insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  dataset: `${DEFAULT_BASE}/data?run=${encodeURIComponent(DEFAULT_RUN)}`,
+  dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(DEFAULT_RUN)}`,
 });
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {

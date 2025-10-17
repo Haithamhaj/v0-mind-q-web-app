@@ -84,13 +84,13 @@ export const formatCurrency = (value: number): string => {
 };
 
 export const formatNumber = (value: number): string => {
-  if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(1)}M`;
+  try {
+    return new Intl.NumberFormat("ar-SA", {
+      maximumFractionDigits: 0,
+    }).format(Math.round(value));
+  } catch {
+    return value.toFixed(0);
   }
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}K`;
-  }
-  return value.toFixed(0);
 };
 
 export const formatPercentage = (value: number): string => {

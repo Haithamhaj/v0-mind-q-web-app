@@ -10,7 +10,7 @@ const navigation = [
   { name: "Pipeline", href: "/pipeline", icon: Play },
   { name: "Phases", href: "/phases", icon: Activity },
   { name: "Results", href: "/results", icon: FileText },
-  { name: "BI Intelligence", href: "/bi-intelligence", icon: Brain },
+  { name: "BI Enhanced", href: "/bi-intelligence", icon: Brain },
   { name: "SLA Compliance", href: "/sla", icon: CheckCircle2 },
   { name: "Data Sources", href: "/sources", icon: Database },
   { name: "Settings", href: "/settings", icon: Settings },
