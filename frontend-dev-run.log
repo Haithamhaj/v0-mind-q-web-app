@@ -1,0 +1,188 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ΓÜá Port 3000 is in use, trying 3001 instead.
+   Γû▓ Next.js 15.2.4
+   - Local:        http://localhost:3001
+   - Network:      http://172.26.128.1:3001
+
+ Γ£ô Starting...
+ Γ£ô Ready in 3.4s
+ Γùï Compiling / ...
+ Γ£ô Compiled / in 2.3s (922 modules)
+ GET / 200 in 3231ms
+(node:35536) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Failed to proxy http://127.0.0.1:9000/healthz Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+ Γùï Compiling /_error ...
+ Γ£ô Compiled /_error in 2.2s (1258 modules)
+ GET / 200 in 2002ms
+ GET / 200 in 37ms
+ Γùï Compiling /pipeline ...
+ Γ£ô Compiled /pipeline in 1164ms (1313 modules)
+ GET /pipeline 200 in 1283ms
+ Γùï Compiling /api/uploads ...
+ Γ£ô Compiled /api/uploads in 551ms (1334 modules)
+ POST /api/uploads 200 in 851ms
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211235/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+ GET /pipeline 200 in 314ms
+ POST /api/uploads 200 in 115ms
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251016211319/pipeline/full Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
+Error: connect ECONNREFUSED 127.0.0.1:9000
+    at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:9000) {
+  errno: -4078,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 9000
+}
