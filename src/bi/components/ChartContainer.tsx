@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Area,
   AreaChart,
@@ -21,6 +21,7 @@ import {
   YAxis,
 } from "recharts";
 import clsx from "clsx";
+import { ChevronsUp } from "lucide-react";
 
 const DEFAULT_COLORS = ["#1d4ed8", "#9333ea", "#0ea5e9", "#16a34a", "#f97316", "#f43f5e", "#10b981"];
 
@@ -37,6 +38,7 @@ type ChartContainerProps = {
   loading?: boolean;
   emptyMessage?: string;
   onPointClick?: (payload: Record<string, unknown>) => void;
+  debugId?: string;
 };
 
 const ensureArray = (value: string | string[] | undefined): string[] => {
@@ -61,10 +63,24 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
   loading = false,
   emptyMessage = "لا توجد بيانات لعرض المخطط.",
   onPointClick,
+  debugId = "unknown",
 }) => {
   const primary = ensureArray(y);
   const secondarySeries = ensureArray(secondaryY);
-
+  
+  useEffect(() => {
+    console.log(`[${debugId}] ChartContainer mounted/updated with:`, {
+      type,
+      dataLength: data?.length,
+      x,
+      y,
+      primary,
+      sampleData: data?.slice(0, 2)
+    });
+  }, [debugId, type, data, x, y, primary]);
+  
+  console.log(`[${debugId}] ChartContainer received type: ${type}, data length: ${data.length}, primary series: ${primary}, secondary series: ${secondarySeries}`);
+  console.log(`[${debugId}] ChartContainer raw props:`, { type, data: data?.slice(0, 2), x, y, secondaryY });
   if (loading) {
     return (
       <div className="h-[280px] w-full animate-pulse rounded-2xl border border-border/30 bg-muted/50" aria-hidden="true" />
@@ -72,6 +88,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
   }
 
   if (!data || !data.length || !primary.length) {
+    console.log(`[${debugId}] Returning empty state: data=${!!data}, data.length=${data?.length}, primary.length=${primary.length}`);
     return <EmptyState message={emptyMessage} />;
   }
 
@@ -85,6 +102,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
 
   const renderChart = (width: number, innerHeight: number) => {
     const chartHeight = innerHeight > 0 ? innerHeight : height;
+    console.log(`Rendering ${type} chart`);
     switch (type) {
       case "line":
         return (
@@ -203,6 +221,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
           </ComposedChart>
         );
       default:
+        console.log(`Unsupported chart type: ${type}`);
         return null;
     }
   };
@@ -211,10 +230,12 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
     <div
       className={clsx("relative flex w-full flex-col gap-2 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm")}
       dir="rtl"
-      style={{ minHeight: height }}
     >
+      <div className="bg-yellow-200 p-2 text-black text-sm mb-2">
+        DEBUG: ChartContainer rendering with {data.length} entries, type: {type}, y: {JSON.stringify(primary)}
+      </div>
       <ResponsiveContainer width="100%" height={height}>
-        {({ width, height: innerHeight }) => renderChart(width, innerHeight)}
+        {(({ width, height: innerHeight }: { width: number; height: number }) => renderChart(width, innerHeight) || <></>) as any}
       </ResponsiveContainer>
     </div>
   );

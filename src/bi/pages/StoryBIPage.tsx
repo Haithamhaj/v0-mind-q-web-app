@@ -3,7 +3,8 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
+import { CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
+import { ChartContainerChartJS } from '../components/ChartContainerChartJS';
 import {
   BiDataProvider,
   useBiData,
@@ -607,14 +608,7 @@ const StoryBIContent: React.FC = () => {
   const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
   const weekdayTrendChart = hasChartData(trends?.weekday) ? trends!.weekday : fallbackTrends.weekday;
   const hourTrendChart = hasChartData(trends?.hour_of_day) ? trends!.hour_of_day : fallbackTrends.hour_of_day;
-  if (process.env.NODE_ENV === "development") {
-    console.groupCollapsed("[story-bi] trend sources");
-    console.info("dataset rows:", dataset.length);
-    console.info("raw trend daily valid:", hasChartData(trends?.daily), "fallback entries:", fallbackTrends.daily?.data?.length ?? 0, "sample:", fallbackTrends.daily?.data?.slice(0, 3));
-    console.info("raw trend weekday valid:", hasChartData(trends?.weekday), "fallback entries:", fallbackTrends.weekday?.data?.length ?? 0, "sample:", fallbackTrends.weekday?.data?.slice(0, 3));
-    console.info("raw trend hour valid:", hasChartData(trends?.hour_of_day), "fallback entries:", fallbackTrends.hour_of_day?.data?.length ?? 0, "sample:", fallbackTrends.hour_of_day?.data?.slice(0, 3));
-    console.groupEnd();
-  }
+  
   const hasAnyTrendChart = Boolean(dailyTrendChart || weekdayTrendChart || hourTrendChart);
   const formatInteger = (value?: number | null) => {
     if (value === null || value === undefined) return '-';
@@ -1051,39 +1045,43 @@ const StoryBIContent: React.FC = () => {
               {dailyTrendChart ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">الطلبات حسب اليوم</h3>
-                  <ChartContainer
+                  <ChartContainerChartJS
+                    key={`daily-trend-${dailyTrendChart.data?.length || 0}`}
                     type={dailyTrendChart.type}
                     data={dailyTrendChart.data}
                     x={dailyTrendChart.x}
                     y={dailyTrendChart.y}
                     secondaryY={dailyTrendChart.secondary_y}
                     emptyMessage="لا توجد بيانات يومية."
+                    debugId="daily-trend"
                   />
                 </div>
               ) : null}
               {weekdayTrendChart ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">التوزيع حسب أيام الأسبوع</h3>
-                  <ChartContainer
+                  <ChartContainerChartJS
                     type={weekdayTrendChart.type}
                     data={weekdayTrendChart.data}
                     x={weekdayTrendChart.x}
                     y={weekdayTrendChart.y}
                     secondaryY={weekdayTrendChart.secondary_y}
                     emptyMessage="لا توجد بيانات أسبوعية."
+                    debugId="weekday-trend"
                   />
                 </div>
               ) : null}
               {hourTrendChart ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">الطلبات حسب الساعة</h3>
-                  <ChartContainer
+                  <ChartContainerChartJS
                     type={hourTrendChart.type}
                     data={hourTrendChart.data}
                     x={hourTrendChart.x}
                     y={hourTrendChart.y}
                     secondaryY={hourTrendChart.secondary_y}
                     emptyMessage="لا توجد بيانات زمنية."
+                    debugId="hour-trend"
                   />
                 </div>
               ) : null}
@@ -1111,13 +1109,14 @@ const StoryBIContent: React.FC = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {resolvedBreakdownChart ? (
-                        <ChartContainer
+                        <ChartContainerChartJS
                           type={resolvedBreakdownChart.type}
                           data={resolvedBreakdownChart.data}
                           x={resolvedBreakdownChart.x}
                           y={resolvedBreakdownChart.y}
                           secondaryY={resolvedBreakdownChart.secondary_y}
                           emptyMessage="لا توجد بيانات كافية للرسم."
+                          debugId={`breakdown-${breakdownKey}`}
                         />
                       ) : (
                         <div className="rounded-xl border border-dashed border-border/40 p-6 text-sm text-muted-foreground">
@@ -1295,13 +1294,14 @@ const StoryBIContent: React.FC = () => {
             <>
               <p className="text-sm text-muted-foreground text-start">{canvasNarrative}</p>
               {activeConfig?.chartType && column ? (
-                <ChartContainer
+                <ChartContainerChartJS
                   type={activeConfig.chartType}
                   data={canvasData}
                   x={canvasXAxis}
                   y={activeConfig.chartType === 'combo' ? ['value'] : 'value'}
                   secondaryY={activeConfig.chartType === 'combo' ? 'share' : undefined}
                   emptyMessage="No data available for the selected combination."
+                  debugId="canvas-chart"
                 />
               ) : (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">

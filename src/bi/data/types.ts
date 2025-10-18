@@ -50,7 +50,11 @@ export type BiDatasetRow = Record<string, unknown>;
 export type CorrelationPair = {
   feature_a: string;
   feature_b: string;
-  correlation?: number | null;\n  abs_correlation?: number | null;\n  sample_size?: number | null;\n  kind?: string;\n  method?: string;
+  correlation?: number | null;
+  abs_correlation?: number | null;
+  sample_size?: number | null;
+  kind?: string;
+  method?: string;
   source?: string | null;
 };
 
