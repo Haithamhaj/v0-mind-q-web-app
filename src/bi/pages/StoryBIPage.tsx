@@ -2,6 +2,7 @@
 
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
 import {
   BiDataProvider,
@@ -24,6 +25,372 @@ type TabConfig = {
   metricId?: string;
   dimension?: string;
   chartType?: 'line' | 'bar' | 'area' | 'funnel' | 'treemap' | 'combo';
+};
+
+type RawMetricsBreakdownValue = {
+  value: string;
+  orders: number;
+  share_pct?: number | null;
+  delivered?: number | null;
+  out_for_delivery?: number | null;
+  returned?: number | null;
+  cod_total?: number | null;
+};
+
+type RawMetricsChart = {
+  title?: string;
+  type: 'line' | 'bar' | 'area' | 'funnel' | 'treemap' | 'combo';
+  x: string;
+  y: string[];
+  secondary_y?: string[];
+  data: Array<Record<string, string | number>>;
+};
+
+type RawMetricsBreakdown = {
+  dimension: string;
+  label: string;
+  values: RawMetricsBreakdownValue[];
+  chart?: RawMetricsChart;
+};
+
+type RawMetricsTrends = {
+  daily?: RawMetricsChart;
+  hour_of_day?: RawMetricsChart;
+  weekday?: RawMetricsChart;
+};
+
+type ChartSeriesMeta = {
+  key: keyof RawMetricsBreakdownValue;
+  label: string;
+  kind: "count" | "percentage" | "amount";
+};
+
+const BREAKDOWN_SERIES_META: ChartSeriesMeta[] = [
+  { key: "orders", label: "الطلبات", kind: "count" },
+  { key: "share_pct", label: "الحصة %", kind: "percentage" },
+  { key: "delivered", label: "تم التسليم", kind: "count" },
+  { key: "out_for_delivery", label: "قيد التسليم", kind: "count" },
+  { key: "returned", label: "مرتجع", kind: "count" },
+  { key: "cod_total", label: "تحصيل COD", kind: "amount" },
+];
+
+type AggregatedTrendStats = {
+  key: number;
+  label: string;
+  orders: number;
+  amount: number;
+  cod: number;
+};
+
+type TrendBuckets = {
+  daily: AggregatedTrendStats[];
+  weekday: AggregatedTrendStats[];
+  hour: AggregatedTrendStats[];
+};
+
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+const toNumber = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const cleaned = value.replace(/[^0-9.\-]+/g, "");
+    if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === "-.") {
+      return undefined;
+    }
+    const normalised = Number(cleaned);
+    if (Number.isFinite(normalised)) {
+      return normalised;
+    }
+  }
+  return undefined;
+};
+
+const ensureDate = (value: unknown): Date | undefined => {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+  const numeric = toNumber(value);
+  if (numeric !== undefined) {
+    const timestamp = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+    const parsed = new Date(timestamp);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  if (typeof value === "string" && value.trim().length) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  return undefined;
+};
+
+const hasChartData = (chart?: RawMetricsChart | null): chart is RawMetricsChart => {
+  if (!chart?.data?.length || !chart.y?.length) {
+    return false;
+  }
+  const yKeys = Array.isArray(chart.y) ? chart.y : [chart.y];
+  return yKeys.some((key) =>
+    chart.data.some((row) => {
+      const value = (row as Record<string, unknown>)[key];
+      return typeof value === "number" && !Number.isNaN(value);
+    }),
+  );
+};
+
+const buildBreakdownChart = (breakdown: RawMetricsBreakdown): RawMetricsChart | undefined => {
+  if (!breakdown.values?.length) {
+    return undefined;
+  }
+
+  const activeSeries = BREAKDOWN_SERIES_META.filter((meta) =>
+    breakdown.values.some((value) => {
+      const record = value as Record<string, unknown>;
+      const numeric = toNumber(record[meta.key]);
+      return numeric !== undefined && Math.abs(numeric) > 0;
+    }),
+  );
+
+  if (!activeSeries.length) {
+    return undefined;
+  }
+
+  const data = breakdown.values.map((value) => {
+    const record = value as Record<string, unknown>;
+    const row: Record<string, string | number> = {
+      breakdown: typeof value.value === "string" && value.value.length ? value.value : "غير معروف",
+    };
+
+  activeSeries.forEach((meta) => {
+    const numeric = toNumber(record[meta.key]);
+    if (numeric !== undefined) {
+      if (meta.kind === "count") {
+        row[meta.label] = Math.round(numeric);
+      } else {
+        row[meta.label] = Number(numeric.toFixed(2));
+      }
+    }
+  });
+
+    return row;
+  });
+
+  const primarySeries = activeSeries.filter((meta) => meta.kind !== "percentage");
+  const percentageSeries = activeSeries.filter((meta) => meta.kind === "percentage");
+
+  if (!primarySeries.length && !percentageSeries.length) {
+    return undefined;
+  }
+
+  let type: RawMetricsChart["type"];
+  let yKeys: string[];
+  let secondaryKeys: string[] | undefined;
+
+  if (primarySeries.length && percentageSeries.length) {
+    type = "combo";
+    yKeys = primarySeries.map((meta) => meta.label);
+    secondaryKeys = percentageSeries.map((meta) => meta.label);
+  } else if (primarySeries.length > 1) {
+    type = "bar";
+    yKeys = primarySeries.map((meta) => meta.label);
+  } else if (primarySeries.length === 1) {
+    type = "bar";
+    yKeys = [primarySeries[0].label];
+  } else {
+    type = "line";
+    yKeys = percentageSeries.map((meta) => meta.label);
+  }
+
+  if (!yKeys.length) {
+    return undefined;
+  }
+
+  return {
+    title: breakdown.label,
+    type,
+    data,
+    x: "breakdown",
+    y: yKeys,
+    secondary_y: secondaryKeys,
+  };
+};
+
+const aggregateTrendBuckets = (rows: Record<string, unknown>[]): TrendBuckets => {
+  const daily = new Map<number, AggregatedTrendStats>();
+  const weekday = new Map<number, AggregatedTrendStats>();
+  const hour = new Map<number, AggregatedTrendStats>();
+
+  const dailyFormatter = new Intl.DateTimeFormat("ar-SA", { month: "short", day: "numeric" });
+  const weekdayFormatter = new Intl.DateTimeFormat("ar-SA", { weekday: "long" });
+
+  const getNumber = (record: Record<string, unknown>, candidates: string[]): number => {
+    for (const candidate of candidates) {
+      const numeric = toNumber(record[candidate]);
+      if (numeric !== undefined) {
+        return numeric;
+      }
+    }
+    return 0;
+  };
+
+  rows.forEach((row) => {
+    const record = row as Record<string, unknown>;
+    const date = ensureDate(
+      record.order_date ?? record.ORDER_DATE ?? record.orderDate ?? record["Order Date"] ?? record["ORDER DATE"],
+    );
+    if (!date) {
+      return;
+    }
+
+    const amount = getNumber(record, ["amount", "AMOUNT", "order_amount", "ORDER_AMOUNT", "Shipment_Value", "SHIPMENT_VALUE"]);
+    const cod = getNumber(record, ["cod_amount", "COD_AMOUNT", "codTotal", "COD_TOTAL"]);
+
+    const dayKey = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const dayStats =
+      daily.get(dayKey) ?? {
+        key: dayKey,
+        label: dailyFormatter.format(date),
+        orders: 0,
+        amount: 0,
+        cod: 0,
+      };
+    dayStats.orders += 1;
+    dayStats.amount += amount;
+    dayStats.cod += cod;
+    daily.set(dayKey, dayStats);
+
+    const weekdayKey = date.getDay();
+    const weekdayStats =
+      weekday.get(weekdayKey) ?? {
+        key: weekdayKey,
+        label: weekdayFormatter.format(date),
+        orders: 0,
+        amount: 0,
+        cod: 0,
+      };
+    weekdayStats.orders += 1;
+    weekdayStats.amount += amount;
+    weekdayStats.cod += cod;
+    weekday.set(weekdayKey, weekdayStats);
+
+    const hourKey = date.getHours();
+    const hourStats =
+      hour.get(hourKey) ?? {
+        key: hourKey,
+        label: `${hourKey.toString().padStart(2, "0")}:00`,
+        orders: 0,
+        amount: 0,
+        cod: 0,
+      };
+    hourStats.orders += 1;
+    hourStats.amount += amount;
+    hourStats.cod += cod;
+    hour.set(hourKey, hourStats);
+  });
+
+  const sortNumeric = (a: AggregatedTrendStats, b: AggregatedTrendStats) => a.key - b.key;
+
+  return {
+    daily: Array.from(daily.values()).sort(sortNumeric),
+    weekday: Array.from(weekday.values()).sort(
+      (a, b) => WEEKDAY_ORDER.indexOf(a.key) - WEEKDAY_ORDER.indexOf(b.key),
+    ),
+    hour: Array.from(hour.values()).sort(sortNumeric),
+  };
+};
+
+const buildTrendChart = (
+  stats: AggregatedTrendStats[],
+  chartType: RawMetricsChart["type"],
+  xKey: string,
+): RawMetricsChart | undefined => {
+  if (!stats.length) {
+    return undefined;
+  }
+
+  const includeAmount = stats.some((item) => item.amount > 0);
+  const includeCod = stats.some((item) => item.cod > 0);
+
+  const data = stats.map((item) => {
+    const row: Record<string, number | string> = {
+      [xKey]: item.label,
+      الطلبات: item.orders,
+    };
+    if (includeAmount) {
+      row["قيمة الطلبات"] = Number(item.amount.toFixed(2));
+    }
+    if (includeCod) {
+      row["تحصيل COD"] = Number(item.cod.toFixed(2));
+    }
+    return row;
+  });
+
+  const yKeys = ["الطلبات"];
+  if (includeAmount) {
+    yKeys.push("قيمة الطلبات");
+  }
+  if (includeCod) {
+    yKeys.push("تحصيل COD");
+  }
+
+  return {
+    type: chartType,
+    data,
+    x: xKey,
+    y: yKeys,
+  };
+};
+
+const buildTrendFallback = (dataset: Record<string, unknown>[]): RawMetricsTrends => {
+  if (!dataset.length) {
+    return {};
+  }
+
+  const buckets = aggregateTrendBuckets(dataset);
+
+  return {
+    daily: buildTrendChart(buckets.daily, "line", "اليوم"),
+    weekday: buildTrendChart(buckets.weekday, "bar", "اليوم"),
+    hour_of_day: buildTrendChart(buckets.hour, "line", "الساعة"),
+  };
+};
+
+const buildBreakdownFallbackMap = (breakdowns: RawMetricsBreakdown[]) => {
+  return breakdowns.reduce<Map<string, RawMetricsChart>>((accumulator, breakdown, index) => {
+    const chart = buildBreakdownChart(breakdown);
+    if (chart) {
+      const key = breakdown.dimension ?? breakdown.label ?? `breakdown-${index}`;
+      accumulator.set(key, chart);
+    }
+    return accumulator;
+  }, new Map<string, RawMetricsChart>());
+};
+
+type RawMetricsSummary = {
+  run: string;
+  fallback_used: boolean;
+  totals: {
+    orders: number;
+    orders_cod: number;
+    orders_cod_share_pct?: number | null;
+    orders_non_cod: number;
+    amount_total?: number | null;
+    cod_total?: number | null;
+    cod_average?: number | null;
+    cod_min?: number | null;
+    cod_max?: number | null;
+  };
+  breakdowns: RawMetricsBreakdown[];
+  trends?: RawMetricsTrends;
+  order_date_range?: { min?: string; max?: string };
+};
+
+const integerFormatter = new Intl.NumberFormat('en-US');
+const decimalFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const percentFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+type RawChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
 };
 
 const parseFormula = (formula?: string): { aggregator: string; column: string | null } => {
@@ -198,6 +565,75 @@ const StoryBIContent: React.FC = () => {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [firstChartLogged, setFirstChartLogged] = useState(false);
+  const [rawMetrics, setRawMetrics] = useState<RawMetricsSummary | null>(null);
+  const [rawMetricsLoading, setRawMetricsLoading] = useState<boolean>(true);
+  const [rawMetricsError, setRawMetricsError] = useState<string | null>(null);
+  const [rawLlmMessages, setRawLlmMessages] = useState<RawChatMessage[]>([
+    { role: 'assistant', content: 'أهلاً! أنا مساعد الأرقام الخام. اسألني عن هذه المؤشرات كما هي في الشيت الأصلي.' },
+  ]);
+  const [rawLlmInput, setRawLlmInput] = useState('');
+  const [rawLlmLoading, setRawLlmLoading] = useState(false);
+  const [rawLlmError, setRawLlmError] = useState<string | null>(null);
+  const breakdowns = rawMetrics?.breakdowns ?? [];
+  const trends = rawMetrics?.trends;
+  const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
+  const fallbackTrends = useMemo(() => buildTrendFallback(dataset as Record<string, unknown>[]), [dataset]);
+  const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
+  const weekdayTrendChart = hasChartData(trends?.weekday) ? trends!.weekday : fallbackTrends.weekday;
+  const hourTrendChart = hasChartData(trends?.hour_of_day) ? trends!.hour_of_day : fallbackTrends.hour_of_day;
+  if (process.env.NODE_ENV === "development") {
+    console.groupCollapsed("[story-bi] trend sources");
+    console.info("dataset rows:", dataset.length);
+    console.info("raw trend daily valid:", hasChartData(trends?.daily), "fallback entries:", fallbackTrends.daily?.data?.length ?? 0, "sample:", fallbackTrends.daily?.data?.slice(0, 3));
+    console.info("raw trend weekday valid:", hasChartData(trends?.weekday), "fallback entries:", fallbackTrends.weekday?.data?.length ?? 0, "sample:", fallbackTrends.weekday?.data?.slice(0, 3));
+    console.info("raw trend hour valid:", hasChartData(trends?.hour_of_day), "fallback entries:", fallbackTrends.hour_of_day?.data?.length ?? 0, "sample:", fallbackTrends.hour_of_day?.data?.slice(0, 3));
+    console.groupEnd();
+  }
+  const hasAnyTrendChart = Boolean(dailyTrendChart || weekdayTrendChart || hourTrendChart);
+  const formatInteger = (value?: number | null) => {
+    if (value === null || value === undefined) return '-';
+    return integerFormatter.format(value);
+  };
+
+  const formatDecimal = (value?: number | null) => {
+    if (value === null || value === undefined) return '-';
+    return decimalFormatter.format(value);
+  };
+
+  const formatPercent = (value?: number | null) => {
+    if (value === null || value === undefined) return '-';
+    return `${percentFormatter.format(value)}%`;
+  };
+
+  const formatCurrency = (value?: number | null) => {
+    const formatted = formatDecimal(value);
+    return formatted === '-' ? '—' : `${formatted} SAR`;
+  };
+
+  const computeBreakdownColumns = (values: RawMetricsBreakdownValue[]) => {
+    const columns: { key: keyof RawMetricsBreakdownValue; label: string; render: (value: RawMetricsBreakdownValue[keyof RawMetricsBreakdownValue]) => string }[] =
+      [
+        { key: 'orders', label: 'الطلبات', render: (value) => formatInteger(value as number | null) },
+        { key: 'share_pct', label: 'الحصة%', render: (value) => formatPercent(value as number | null) },
+        { key: 'delivered', label: 'تم التسليم', render: (value) => formatInteger(value as number | null) },
+        { key: 'out_for_delivery', label: 'قيد التسليم', render: (value) => formatInteger(value as number | null) },
+        { key: 'returned', label: 'مرتجع', render: (value) => formatInteger(value as number | null) },
+        { key: 'cod_total', label: 'تحصيل COD', render: (value) => formatCurrency(value as number | null) },
+      ];
+
+    return columns.filter((column) =>
+      values.some((entry) => {
+        const raw = entry[column.key];
+        if (raw === null || raw === undefined) {
+          return false;
+        }
+        if (typeof raw === 'number') {
+          return raw !== 0;
+        }
+        return true;
+      }),
+    );
+  };
 
   useEffect(() => {
     if (typeof performance !== 'undefined') {
@@ -211,6 +647,44 @@ const StoryBIContent: React.FC = () => {
       setSelectedKpi(tabs[0].metricId ?? metrics[0]?.id ?? null);
     }
   }, [tabs, activeTab, metrics]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
+    const loadRawMetrics = async () => {
+      try {
+        setRawMetricsLoading(true);
+        setRawMetricsError(null);
+        const response = await fetch(`/api/bi/metrics/raw?run=run-latest&top=6`, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Failed to load raw metrics: ${response.status}`);
+        }
+        const data = (await response.json()) as RawMetricsSummary;
+        if (isMounted) {
+          setRawMetrics(data);
+        }
+      } catch (error) {
+        if (!isMounted || (error instanceof DOMException && error.name === 'AbortError')) {
+          return;
+        }
+        console.error('[story-bi] failed to load raw metrics', error);
+        setRawMetricsError(error instanceof Error ? error.message : 'تعذّر تحميل الإحصاءات الخام.');
+        setRawMetrics(null);
+      } finally {
+        if (isMounted) {
+          setRawMetricsLoading(false);
+        }
+      }
+    };
+
+    loadRawMetrics();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, []);
 
   const activeConfig = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const metricId = selectedKpi ?? activeConfig?.metricId ?? metrics[0]?.id ?? null;
@@ -245,6 +719,26 @@ const StoryBIContent: React.FC = () => {
       setFirstChartLogged(true);
     }
   }, [dimensionSeries, timeSeries, firstChartLogged]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__storyBiDebug = () => ({
+        datasetLength: dataset.length,
+        sampleRow: dataset[0],
+        fallbackTrendDaily: fallbackTrends.daily,
+        fallbackTrendWeekday: fallbackTrends.weekday,
+        fallbackTrendHour: fallbackTrends.hour_of_day,
+        resolvedTrendDaily: dailyTrendChart,
+        resolvedTrendWeekday: weekdayTrendChart,
+        resolvedTrendHour: hourTrendChart,
+        fallbackBreakdownCharts: Array.from(fallbackBreakdownCharts.entries()).map(([key, value]) => ({
+          key,
+          rows: value?.data?.length ?? 0,
+          sample: value?.data?.slice(0, 5),
+        })),
+      });
+    }
+  }, [dataset, fallbackTrends, dailyTrendChart, weekdayTrendChart, hourTrendChart, fallbackBreakdownCharts]);
 
   const handleCardSelect = (metricIdValue: string) => {
     setSelectedKpi(metricIdValue);
@@ -331,6 +825,60 @@ const StoryBIContent: React.FC = () => {
     setChatInput('');
   };
 
+  const handleRawLlmSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const question = rawLlmInput.trim();
+    if (!question) return;
+
+    const payload = {
+      run: rawMetrics?.run ?? 'run-latest',
+      top: 6,
+      question,
+      history: rawLlmMessages
+        .slice(-6)
+        .map((message) => ({ role: message.role, content: message.content })),
+    };
+
+    setRawLlmLoading(true);
+    setRawLlmError(null);
+    setRawLlmMessages((prev) => [...prev, { role: 'user', content: question }]);
+    setRawLlmInput('');
+
+    try {
+      const response = await fetch('/api/bi/metrics/raw/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error(`LLM request failed (${response.status})`);
+      }
+      const data = await response.json();
+      const replyPayload = data?.reply;
+      let replyText = '';
+      if (typeof replyPayload === 'string') {
+        replyText = replyPayload;
+      } else if (replyPayload && typeof replyPayload === 'object') {
+        replyText = String(replyPayload.reply ?? replyPayload.summary ?? JSON.stringify(replyPayload));
+      } else {
+        replyText = 'لا توجد إجابة مفهومة.';
+      }
+      setRawLlmMessages((prev) => [...prev, { role: 'assistant', content: replyText }]);
+    } catch (error) {
+      console.error('[story-bi] raw metrics LLM failed', error);
+      setRawLlmError(error instanceof Error ? error.message : 'حدث خطأ أثناء التواصل مع نموذج الذكاء الاصطناعي.');
+      setRawLlmMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'تعذر توليد إجابة في الوقت الحالي. حاول مجددًا لاحقًا.',
+        },
+      ]);
+    } finally {
+      setRawLlmLoading(false);
+    }
+  };
+
   const canvasData =
     activeConfig?.chartType === 'line' && timeColumn
       ? timeSeries
@@ -363,6 +911,246 @@ const StoryBIContent: React.FC = () => {
           Built from Phase 08 insights, Phase 09 validation, and Phase 10 marts. Columns are discovered at runtime; no hardcoded schema.
         </p>
       </header>
+
+            {rawMetricsLoading ? (
+        <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm text-muted-foreground shadow-sm">
+          جارٍ تحميل الإحصاءات الخام...
+        </div>
+      ) : rawMetricsError ? (
+        <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive-foreground shadow-sm">
+          تعذّر تحميل الإحصاءات الخام: {rawMetricsError}
+        </div>
+      ) : rawMetrics ? (
+        <section className="flex flex-col gap-6 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="border-border/40 bg-background/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-foreground">عدد الطلبات (RAW)</CardTitle>
+                <CardDescription>الأعداد مباشرة قبل أي معالجة</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-2xl font-bold text-foreground">{formatInteger(rawMetrics.totals.orders)}</p>
+                <p className="text-xs text-muted-foreground">
+                  COD: {formatInteger(rawMetrics.totals.orders_cod)}
+                  {formatPercent(rawMetrics.totals.orders_cod_share_pct) !== '—' ? (
+                    <span> ({formatPercent(rawMetrics.totals.orders_cod_share_pct)})</span>
+                  ) : null}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/40 bg-background/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-foreground">تحصيل COD الخام</CardTitle>
+                <CardDescription>الإجمالي والمتوسط من الشيت الأصلي</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-2xl font-bold text-foreground">{formatCurrency(rawMetrics.totals.cod_total)}</p>
+                <p className="text-xs text-muted-foreground">متوسط التذكرة: {formatCurrency(rawMetrics.totals.cod_average)}</p>
+                <p className="text-xs text-muted-foreground">
+                  نطاق القيم: {formatCurrency(rawMetrics.totals.cod_min)} – {formatCurrency(rawMetrics.totals.cod_max)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/40 bg-background/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-foreground">القيمة الإجمالية الملتقطة</CardTitle>
+                <CardDescription>يشمل جميع طرق الدفع قبل أي معالجة</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-2xl font-bold text-foreground">{formatCurrency(rawMetrics.totals.amount_total)}</p>
+                <p className="text-xs text-muted-foreground">الطلبات غير COD: {formatInteger(rawMetrics.totals.orders_non_cod)}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/40 bg-background/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-foreground">نطاق البيانات الخام</CardTitle>
+                <CardDescription>يمثل ما بين أول وآخر تاريخ في الشيت</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <div>
+                  <span className="font-semibold text-foreground">من:</span>{' '}
+                  {rawMetrics.order_date_range?.min ?? 'غير متاح'}
+                </div>
+                <div>
+                  <span className="font-semibold text-foreground">إلى:</span>{' '}
+                  {rawMetrics.order_date_range?.max ?? 'غير متاح'}
+                </div>
+                <div className="text-xs">
+                  Run: <span className="font-mono text-foreground">{rawMetrics.run}</span>
+                  {rawMetrics.fallback_used ? <span className="ml-2 text-destructive">(استخدم مصدر بديل)</span> : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {hasAnyTrendChart ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {dailyTrendChart ? (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">الطلبات حسب اليوم</h3>
+                  <ChartContainer
+                    type={dailyTrendChart.type}
+                    data={dailyTrendChart.data}
+                    x={dailyTrendChart.x}
+                    y={dailyTrendChart.y}
+                    secondaryY={dailyTrendChart.secondary_y}
+                    emptyMessage="لا توجد بيانات يومية."
+                  />
+                </div>
+              ) : null}
+              {weekdayTrendChart ? (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">التوزيع حسب أيام الأسبوع</h3>
+                  <ChartContainer
+                    type={weekdayTrendChart.type}
+                    data={weekdayTrendChart.data}
+                    x={weekdayTrendChart.x}
+                    y={weekdayTrendChart.y}
+                    secondaryY={weekdayTrendChart.secondary_y}
+                    emptyMessage="لا توجد بيانات أسبوعية."
+                  />
+                </div>
+              ) : null}
+              {hourTrendChart ? (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">الطلبات حسب الساعة</h3>
+                  <ChartContainer
+                    type={hourTrendChart.type}
+                    data={hourTrendChart.data}
+                    x={hourTrendChart.x}
+                    y={hourTrendChart.y}
+                    secondaryY={hourTrendChart.secondary_y}
+                    emptyMessage="لا توجد بيانات زمنية."
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}\n{breakdowns.length ? (
+            <div className="flex flex-col gap-4">
+              {breakdowns.map((breakdown, index) => {
+                const columns = computeBreakdownColumns(breakdown.values);
+                const breakdownKey = breakdown.dimension ?? breakdown.label ?? `breakdown-${index}`;
+                const resolvedBreakdownChart = hasChartData(breakdown.chart)
+                  ? breakdown.chart
+                  : fallbackBreakdownCharts.get(breakdownKey);
+                if (process.env.NODE_ENV === "development") {
+                  console.groupCollapsed("[story-bi] breakdown chart", breakdownKey);
+                  console.info("raw chart valid:", hasChartData(breakdown.chart), "fallback rows:", resolvedBreakdownChart?.data?.length ?? 0);
+                  console.info("fallback sample:", resolvedBreakdownChart?.data?.slice(0, 5));
+                  console.info("columns detected:", columns.map((column) => column.label));
+                  console.groupEnd();
+                }
+                return (
+                  <Card key={breakdownKey} className="border-border/40 bg-background/80 shadow-sm">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-semibold text-foreground">{breakdown.label}</CardTitle>
+                      <CardDescription>أبرز القيم المتكررة ومؤشراتها الرئيسية</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {resolvedBreakdownChart ? (
+                        <ChartContainer
+                          type={resolvedBreakdownChart.type}
+                          data={resolvedBreakdownChart.data}
+                          x={resolvedBreakdownChart.x}
+                          y={resolvedBreakdownChart.y}
+                          secondaryY={resolvedBreakdownChart.secondary_y}
+                          emptyMessage="لا توجد بيانات كافية للرسم."
+                        />
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border/40 p-6 text-sm text-muted-foreground">
+                          لا توجد بيانات كافية للرسم.
+                        </div>
+                      )}
+                      <div className="overflow-hidden rounded-xl border border-border/40">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/30 text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2 text-start">القيمة</th>
+                              {columns.map((column) => (
+                                <th key={column.key} className="px-3 py-2 text-start">
+                                  {column.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {breakdown.values.map((value) => (
+                              <tr key={value.value} className="border-t border-border/30">
+                                <td className="px-3 py-2 text-start font-medium text-foreground">{value.value}</td>
+                                {columns.map((column) => (
+                                  <td key={`${value.value}-${column.key}`} className="px-3 py-2 text-start">
+                                    {column.render(value[column.key])}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border/60 bg-muted/10 p-4 text-sm text-muted-foreground">
+              لا توجد أبعاد قابلة للتحليل في هذا الشيت.
+            </div>
+          )}
+
+          <Card className="border-border/40 bg-background/80 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold text-foreground">مساعد الأرقام الخام (LLM)</CardTitle>
+              <CardDescription>يجيب فقط عن الأسئلة المتعلقة بالمؤشرات أعلاه.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {rawLlmError ? (
+                <div className="rounded-lg border border-destructive/60 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
+                  {rawLlmError}
+                </div>
+              ) : null}
+              <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-border/40 bg-muted/10 p-3 text-xs">
+                {rawLlmMessages.map((message, index) => (
+                  <div key={`raw-llm-${index}`} className={`flex ${message.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                    <span
+                      className={`inline-flex max-w-[75%] rounded-2xl px-3 py-2 ${
+                        message.role === 'user'
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-sky-500/10 text-sky-600 dark:text-sky-300'
+                      }`}
+                    >
+                      {message.content}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <form onSubmit={handleRawLlmSubmit} className="space-y-2">
+                <textarea
+                  value={rawLlmInput}
+                  onChange={(event) => setRawLlmInput(event.target.value)}
+                  placeholder="اكتب سؤالك حول الأرقام الخام..."
+                  className="h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    هذا المساعد متخصص في هذه المرحلة فقط. للاستفسار عن مراحل أخرى استخدم الأقسام اللاحقة.
+                  </p>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                    disabled={rawLlmLoading}
+                  >
+                    {rawLlmLoading ? 'جارٍ المعالجة...' : 'إرسال'}
+                  </button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <FilterBar />
 
@@ -492,3 +1280,6 @@ export const StoryBIPage: React.FC = () => {
 };
 
 export default StoryBIPage;
+
+
+
