@@ -26,6 +26,11 @@ export const useBiInsights = () => {
   return { insights, loading };
 };
 
+export const useBiCorrelations = () => {
+  const { correlations } = useBiDataContext();
+  return correlations;
+};
+
 export const useDimensionValues = (dimension: string) => {
   const { dataset } = useBiDataContext();
 
@@ -59,3 +64,4 @@ export const useFilteredDataset = () => {
     );
   }, [dataset, filters]);
 };
+

@@ -2,11 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import { fallbackDataset, fallbackDimensions, fallbackInsights, fallbackMetrics } from "./fallback";
+import { fallbackCorrelations, fallbackDataset, fallbackDimensions, fallbackInsights, fallbackMetrics } from "./fallback";
 import { mockDataset, mockDimensions, mockInsights, mockMetrics } from "./mocks";
-import { BiDataContextValue, BiDatasetRow, DimensionsCatalog, Insight, MetricSpec } from "./types";
+import { BiDataContextValue, BiDatasetRow, CorrelationCollection, DimensionsCatalog, Insight, MetricSpec } from "./types";
 
-type EndpointOverrides = Partial<Record<"metrics" | "dimensions" | "insights" | "dataset", string>>;
+type EndpointOverrides = Partial<Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations", string>>;
 
 type BiDataProviderProps = {
   children: React.ReactNode;
@@ -31,6 +31,7 @@ const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
   dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(DEFAULT_RUN)}`,
   insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(DEFAULT_RUN)}`,
   dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(DEFAULT_RUN)}`,
+  correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(DEFAULT_RUN)}&top=50`,
 });
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {
@@ -85,6 +86,9 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const [dataset, setDataset] = useState<BiDatasetRow[]>(
     fallbackDataset.length ? clampRows(fallbackDataset) : clampRows(mockDataset),
   );
+  const [correlations, setCorrelations] = useState<CorrelationCollection>(
+    fallbackCorrelations,
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | undefined>();
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -95,11 +99,12 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     const load = async () => {
       setLoading(true);
       try {
-        const [metricsRes, dimensionsRes, insightsRes, datasetRes] = await Promise.all([
+        const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes] = await Promise.all([
           fetchJson<MetricSpec[]>(mergedEndpoints.metrics, fallbackMetrics),
           fetchJson<DimensionsCatalog>(mergedEndpoints.dimensions, fallbackDimensions),
           fetchJson<Insight[]>(mergedEndpoints.insights, fallbackInsights),
           fetchDataset(mergedEndpoints.dataset, fallbackDataset),
+          fetchJson<CorrelationCollection>(mergedEndpoints.correlations, fallbackCorrelations),
         ]);
 
         if (!active) return;
@@ -116,6 +121,11 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
             ? clampRows(fallbackDataset)
             : clampRows(mockDataset),
         );
+        const resolvedCorrelations =
+          correlationsRes && Array.isArray(correlationsRes.numeric) && Array.isArray(correlationsRes.datetime)
+            ? correlationsRes
+            : fallbackCorrelations;
+        setCorrelations(resolvedCorrelations);
         setError(undefined);
       } catch (err) {
         if (!active) return;
@@ -125,6 +135,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         setDimensions(fallbackDimensions.date.length ? fallbackDimensions : mockDimensions);
         setInsights(fallbackInsights.length ? fallbackInsights : mockInsights);
         setDataset(fallbackDataset.length ? clampRows(fallbackDataset) : clampRows(mockDataset));
+        setCorrelations(fallbackCorrelations);
       } finally {
         if (active) {
           setLoading(false);
@@ -137,7 +148,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     return () => {
       active = false;
     };
-  }, [mergedEndpoints.metrics, mergedEndpoints.dimensions, mergedEndpoints.insights, mergedEndpoints.dataset]);
+  }, [mergedEndpoints.metrics, mergedEndpoints.dimensions, mergedEndpoints.insights, mergedEndpoints.dataset, mergedEndpoints.correlations]);
 
   const value = useMemo<BiDataContextValue>(
     () => ({
@@ -145,6 +156,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       dimensions,
       insights,
       dataset,
+      correlations,
       loading,
       error,
       filters,
@@ -163,7 +175,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         });
       },
     }),
-    [metrics, dimensions, insights, dataset, loading, error, filters],
+    [metrics, dimensions, insights, dataset, correlations, loading, error, filters],
   );
 
   return <BiDataContext.Provider value={value}>{children}</BiDataContext.Provider>;
@@ -176,3 +188,6 @@ export const useBiDataContext = (): BiDataContextValue => {
   }
   return context;
 };
+
+
+

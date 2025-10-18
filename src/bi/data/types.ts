@@ -47,11 +47,31 @@ export type Insight = {
 
 export type BiDatasetRow = Record<string, unknown>;
 
+export type CorrelationPair = {
+  feature_a: string;
+  feature_b: string;
+  correlation?: number | null;
+  abs_correlation?: number | null;
+  sample_size?: number | null;
+  kind: "numeric" | "datetime";
+  source?: string | null;
+};
+
+export type CorrelationCollection = {
+  numeric: CorrelationPair[];
+  datetime: CorrelationPair[];
+  sources?: {
+    numeric?: string | null;
+    datetime?: string | null;
+  };
+};
+
 export type BiDataContextValue = {
   metrics: MetricSpec[];
   dimensions: DimensionsCatalog;
   insights: Insight[];
   dataset: BiDatasetRow[];
+  correlations: CorrelationCollection;
   loading: boolean;
   error?: string;
   filters: Record<string, string[]>;

@@ -3,7 +3,7 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
+import { ChartContainer, CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
 import {
   BiDataProvider,
   useBiData,
@@ -11,8 +11,9 @@ import {
   useFilteredDataset,
   useBiInsights,
   useBiMetrics,
+  useBiCorrelations,
 } from '../data';
-import type { Insight, MetricSpec } from '../data';
+import type { CorrelationCollection, Insight, MetricSpec } from '../data';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -365,8 +366,7 @@ const buildBreakdownFallbackMap = (breakdowns: RawMetricsBreakdown[]) => {
   }, new Map<string, RawMetricsChart>());
 };
 
-type RawMetricsSummary = {
-  run: string;
+type RawMetricsSummary = {\n  run: string;
   fallback_used: boolean;
   totals: {
     orders: number;
@@ -548,6 +548,7 @@ const StoryBIContent: React.FC = () => {
   const dataset = useFilteredDataset();
   const { setFilter } = useBiData();
   const { insights } = useBiInsights();
+  const correlations = useBiCorrelations();
 
   const categoricalNames = useMemo(
     () => dimensions.categorical.map((item) => item.name).filter(Boolean),
@@ -555,6 +556,9 @@ const StoryBIContent: React.FC = () => {
   );
 
   const tabs = useMemo(() => buildTabs(metrics, categoricalNames), [metrics, categoricalNames]);
+
+  const numericHighlights = useMemo(() => correlations.numeric.slice(0, 6), [correlations.numeric]);
+  const datetimeHighlights = useMemo(() => correlations.datetime.slice(0, 6), [correlations.datetime]);
 
   const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? 'narrative');
   const [selectedKpi, setSelectedKpi] = useState<string | null>(tabs[0]?.metricId ?? metrics[0]?.id ?? null);
@@ -576,6 +580,9 @@ const StoryBIContent: React.FC = () => {
   const [rawLlmError, setRawLlmError] = useState<string | null>(null);
   const breakdowns = rawMetrics?.breakdowns ?? [];
   const trends = rawMetrics?.trends;
+  const rawCorrelationData: CorrelationCollection = rawMetrics?.correlations ?? correlations;
+  const rawNumericHighlights = rawCorrelationData.numeric.slice(0, 4);
+  const rawDatetimeHighlights = rawCorrelationData.datetime.slice(0, 4);
   const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
   const fallbackTrends = useMemo(() => buildTrendFallback(dataset as Record<string, unknown>[]), [dataset]);
   const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
@@ -984,6 +991,19 @@ const StoryBIContent: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+            <CorrelationListCard
+              title="روابط عددية (RAW)"
+              items={rawNumericHighlights}
+              limit={4}
+              emptyMessage="لا توجد ارتباطات عددية في البيانات الخام."
+            />
+
+            <CorrelationListCard
+              title="روابط زمنية (RAW)"
+              items={rawDatetimeHighlights}
+              limit={4}
+              emptyMessage="لا توجد ارتباطات زمنية في البيانات الخام."
+            />
           </div>
 
           {hasAnyTrendChart ? (
@@ -1193,6 +1213,21 @@ const StoryBIContent: React.FC = () => {
         ))}
       </nav>
 
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <CorrelationListCard
+          title="أبرز الارتباطات العددية"
+          items={numericHighlights}
+          limit={6}
+          emptyMessage="لا توجد ارتباطات عددية متاحة."
+        />
+        <CorrelationListCard
+          title="أبرز الارتباطات الزمنية"
+          items={datetimeHighlights}
+          limit={6}
+          emptyMessage="لا توجد ارتباطات زمنية متاحة."
+        />
+      </section>
+
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-start">Insight Canvas</h2>
@@ -1280,6 +1315,11 @@ export const StoryBIPage: React.FC = () => {
 };
 
 export default StoryBIPage;
+
+
+
+
+
 
 
 

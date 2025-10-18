@@ -1,4 +1,4 @@
-import type { BiDatasetRow, DimensionsCatalog, Insight, MetricSpec } from "./types";
+import type { BiDatasetRow, CorrelationCollection, DimensionsCatalog, Insight, MetricSpec } from "./types";
 
 export const fallbackMetrics: MetricSpec[] = [
   {
@@ -71,3 +71,9 @@ export const fallbackDimensions: DimensionsCatalog = {
 export const fallbackInsights: Insight[] = [];
 
 export const fallbackDataset: BiDatasetRow[] = [];
+
+export const fallbackCorrelations: CorrelationCollection = {
+  numeric: [],
+  datetime: [],
+  sources: {},
+};
