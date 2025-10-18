@@ -15,19 +15,23 @@ type KpiCardProps = {
 };
 
 const formatNumber = (input: number | string): string => {
-  if (typeof input !== "number") {
-    return input;
+  if (typeof input !== "number" || !Number.isFinite(input)) {
+    return typeof input === "string" ? input : String(input ?? "");
   }
-  if (Math.abs(input) >= 1_000_000) {
-    return `${(input / 1_000_000).toFixed(1)}M`;
+
+  const isInteger = Number.isInteger(input);
+  const value = isInteger ? input : Number(input.toFixed(2));
+  const [integerPart, fractionalPart] = value.toString().split(".");
+  const sign = integerPart.startsWith("-") ? "-" : "";
+  const digits = sign ? integerPart.slice(1) : integerPart;
+  const groupedInteger = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  if (isInteger) {
+    return `${sign}${groupedInteger}`;
   }
-  if (Math.abs(input) >= 1_000) {
-    return `${(input / 1_000).toFixed(1)}K`;
-  }
-  if (Number.isInteger(input)) {
-    return input.toString();
-  }
-  return input.toFixed(2);
+
+  const paddedFraction = (fractionalPart ?? "").padEnd(2, "0").slice(0, 2);
+  return `${sign}${groupedInteger}.${paddedFraction}`;
 };
 
 const Sparkline = ({ points }: { points: number[] }) => {

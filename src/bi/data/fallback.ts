@@ -4,7 +4,7 @@ export const fallbackMetrics: MetricSpec[] = [
   {
     id: "orders_volume",
     title: "Orders Volume",
-    formula: "SUM(kpi_orders_cnt)",
+    formula: "MAX(kpi_orders_cnt)",
     unit: "count",
     fmt: "integer",
     join_keys: ["entity_id", "scenario_id"],
@@ -13,7 +13,7 @@ export const fallbackMetrics: MetricSpec[] = [
   {
     id: "cod_collected_total",
     title: "COD Collected (Total)",
-    formula: "SUM(kpi_cod_total)",
+    formula: "MAX(kpi_cod_total)",
     unit: "amount",
     currency: "SAR",
     fmt: "sar_currency",

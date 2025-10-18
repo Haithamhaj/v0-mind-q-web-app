@@ -56,13 +56,31 @@ const computeMetricSummary = (rows: Record<string, unknown>[], metric: MetricSpe
     return { value: 0, spark: [] as number[] };
   }
 
+  const joinKeys = Array.isArray(metric.join_keys) ? metric.join_keys : [];
+  const seen = new Set<string>();
   const numericSeries = rows
     .map((row) => {
       const value = Number(row[column]);
-      const timestamp = timeColumn ? row[timeColumn] : undefined;
-      return { value, timestamp: timestamp ? String(timestamp) : undefined };
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+      const timestamp = timeColumn ? (row[timeColumn] !== undefined ? String(row[timeColumn]) : undefined) : undefined;
+      const dedupKeyParts = joinKeys
+        .map((key) => (row[key] !== undefined && row[key] !== null ? String(row[key]) : ""))
+        .filter(Boolean);
+      if (timestamp) {
+        dedupKeyParts.push(timestamp);
+      }
+      const dedupKey = dedupKeyParts.length ? dedupKeyParts.join("||") : undefined;
+      if (dedupKey && seen.has(dedupKey)) {
+        return null;
+      }
+      if (dedupKey) {
+        seen.add(dedupKey);
+      }
+      return { value, timestamp };
     })
-    .filter((entry) => Number.isFinite(entry.value));
+    .filter((entry): entry is { value: number; timestamp?: string } => entry !== null);
 
   const value = aggregateValues(
     numericSeries.map((entry) => entry.value),
