@@ -75,5 +75,11 @@ export const fallbackDataset: BiDatasetRow[] = [];
 export const fallbackCorrelations: CorrelationCollection = {
   numeric: [],
   datetime: [],
+  business: {
+    numeric_numeric: [],
+    numeric_categorical: [],
+    categorical_categorical: [],
+  },
   sources: {},
 };
+

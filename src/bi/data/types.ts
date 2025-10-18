@@ -50,19 +50,35 @@ export type BiDatasetRow = Record<string, unknown>;
 export type CorrelationPair = {
   feature_a: string;
   feature_b: string;
+  correlation?: number | null;\n  abs_correlation?: number | null;\n  sample_size?: number | null;\n  kind?: string;\n  method?: string;
+  source?: string | null;
+};
+
+export type BusinessCorrelation = {
+  feature_a: string;
+  feature_b: string;
   correlation?: number | null;
   abs_correlation?: number | null;
   sample_size?: number | null;
-  kind: "numeric" | "datetime";
-  source?: string | null;
+  method?: string;
+  kind?: string;
+  notes?: Record<string, unknown>;
+};
+
+export type BusinessCorrelationGroups = {
+  numeric_numeric: BusinessCorrelation[];
+  numeric_categorical: BusinessCorrelation[];
+  categorical_categorical: BusinessCorrelation[];
 };
 
 export type CorrelationCollection = {
   numeric: CorrelationPair[];
   datetime: CorrelationPair[];
+  business: BusinessCorrelationGroups | null;
   sources?: {
     numeric?: string | null;
     datetime?: string | null;
+    business?: string | null;
   };
 };
 
@@ -77,3 +93,4 @@ export type BiDataContextValue = {
   filters: Record<string, string[]>;
   setFilter: (dimension: string, values: string[]) => void;
 };
+

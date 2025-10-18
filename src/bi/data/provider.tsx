@@ -123,7 +123,21 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         );
         const resolvedCorrelations =
           correlationsRes && Array.isArray(correlationsRes.numeric) && Array.isArray(correlationsRes.datetime)
-            ? correlationsRes
+            ? {
+                numeric: correlationsRes.numeric ?? [],
+                datetime: correlationsRes.datetime ?? [],
+                business:
+                  correlationsRes.business ??
+                  {
+                    numeric_numeric: [],
+                    numeric_categorical: [],
+                    categorical_categorical: [],
+                  },
+                sources: {
+                  ...(fallbackCorrelations.sources ?? {}),
+                  ...(correlationsRes.sources ?? {}),
+                },
+              }
             : fallbackCorrelations;
         setCorrelations(resolvedCorrelations);
         setError(undefined);

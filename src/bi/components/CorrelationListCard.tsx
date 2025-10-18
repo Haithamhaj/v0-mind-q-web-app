@@ -32,11 +32,28 @@ const formatSample = (value?: number | null): string => {
   return integerFormatter.format(Math.round(Number(value)));
 };
 
+const formatMethod = (method?: string): string | undefined => {
+  if (!method) {
+    return undefined;
+  }
+  const normalized = method.toLowerCase();
+  if (normalized === "pearson") {
+    return "Pearson r";
+  }
+  if (normalized === "eta_squared") {
+    return "Eta^2";
+  }
+  if (normalized === "cramers_v" || normalized === "cramer_v" || normalized === "cramersv") {
+    return "Cramer's V";
+  }
+  return method.replace(/_/g, " ");
+};
+
 export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
   title,
   items,
   limit = 6,
-  emptyMessage = "لا توجد بيانات ارتباط متاحة.",
+  emptyMessage = "No correlations available.",
 }) => {
   const resolved = Array.isArray(items) ? items.slice(0, limit) : [];
 
@@ -54,6 +71,7 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
               const key = `${item.feature_a}::${item.feature_b}`;
               const correlationValue = formatCorrelation(item.correlation);
               const sampleLabel = formatSample(item.sample_size);
+              const methodLabel = formatMethod(item.method);
               const tone =
                 item.correlation !== undefined && item.correlation !== null && Number(item.correlation) < 0
                   ? "text-rose-600 dark:text-rose-400"
@@ -69,7 +87,10 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                   </div>
                   <div className="text-right">
                     <div className={`text-sm font-semibold ${tone}`}>{correlationValue}</div>
-                    <div className="text-xs text-muted-foreground">n≈{sampleLabel}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {methodLabel ? `${methodLabel} ~ ` : ""}
+                      n~{sampleLabel}
+                    </div>
                   </div>
                 </li>
               );
@@ -82,3 +103,8 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
 };
 
 export default CorrelationListCard;
+
+
+
+
+

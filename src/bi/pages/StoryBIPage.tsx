@@ -366,7 +366,9 @@ const buildBreakdownFallbackMap = (breakdowns: RawMetricsBreakdown[]) => {
   }, new Map<string, RawMetricsChart>());
 };
 
-type RawMetricsSummary = {\n  run: string;
+type RawMetricsSummary = {
+  run: string;
+  artifacts_root?: string | null;
   fallback_used: boolean;
   totals: {
     orders: number;
@@ -382,6 +384,7 @@ type RawMetricsSummary = {\n  run: string;
   breakdowns: RawMetricsBreakdown[];
   trends?: RawMetricsTrends;
   order_date_range?: { min?: string; max?: string };
+  correlations?: CorrelationCollection;
 };
 
 const integerFormatter = new Intl.NumberFormat('en-US');
@@ -583,6 +586,22 @@ const StoryBIContent: React.FC = () => {
   const rawCorrelationData: CorrelationCollection = rawMetrics?.correlations ?? correlations;
   const rawNumericHighlights = rawCorrelationData.numeric.slice(0, 4);
   const rawDatetimeHighlights = rawCorrelationData.datetime.slice(0, 4);
+  const rawBusinessGroups = rawCorrelationData.business ?? {
+    numeric_numeric: [],
+    numeric_categorical: [],
+    categorical_categorical: [],
+  };
+  const rawBusinessNumeric = rawBusinessGroups.numeric_numeric.slice(0, 4);
+  const rawBusinessNumericCategorical = rawBusinessGroups.numeric_categorical.slice(0, 4);
+  const rawBusinessCategorical = rawBusinessGroups.categorical_categorical.slice(0, 4);
+  const businessGroups = correlations.business ?? {
+    numeric_numeric: [],
+    numeric_categorical: [],
+    categorical_categorical: [],
+  };
+  const businessNumericHighlights = businessGroups.numeric_numeric.slice(0, 6);
+  const businessNumericCategoricalHighlights = businessGroups.numeric_categorical.slice(0, 6);
+  const businessCategoricalHighlights = businessGroups.categorical_categorical.slice(0, 6);
   const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
   const fallbackTrends = useMemo(() => buildTrendFallback(dataset as Record<string, unknown>[]), [dataset]);
   const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
@@ -1004,6 +1023,27 @@ const StoryBIContent: React.FC = () => {
               limit={4}
               emptyMessage="لا توجد ارتباطات زمنية في البيانات الخام."
             />
+
+            <CorrelationListCard
+              title="روابط أعمال (RAW)"
+              items={rawBusinessNumeric}
+              limit={4}
+              emptyMessage="لا توجد روابط أعمال في البيانات الخام."
+            />
+
+            <CorrelationListCard
+              title="أثر الفئات على المقاييس (RAW)"
+              items={rawBusinessNumericCategorical}
+              limit={4}
+              emptyMessage="لا توجد روابط فئوية في البيانات الخام."
+            />
+            <CorrelationListCard
+              title="روابط الفئات (RAW)"
+              items={rawBusinessCategorical}
+              limit={4}
+              emptyMessage="لا توجد روابط فئات في البيانات الخام."
+            />
+
           </div>
 
           {hasAnyTrendChart ? (
@@ -1226,6 +1266,24 @@ const StoryBIContent: React.FC = () => {
           limit={6}
           emptyMessage="لا توجد ارتباطات زمنية متاحة."
         />
+        <CorrelationListCard
+          title="روابط أعمال"
+          items={businessNumericHighlights}
+          limit={6}
+          emptyMessage="لا توجد روابط أعمال حالياً."
+        />
+        <CorrelationListCard
+          title="أثر الفئات على المقاييس"
+          items={businessNumericCategoricalHighlights}
+          limit={6}
+          emptyMessage="لا توجد روابط فئوية حالياً."
+        />
+        <CorrelationListCard
+          title="روابط فئات متبادلة"
+          items={businessCategoricalHighlights}
+          limit={6}
+          emptyMessage="لا توجد روابط فئات متاحة."
+        />
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
@@ -1315,6 +1373,7 @@ export const StoryBIPage: React.FC = () => {
 };
 
 export default StoryBIPage;
+
 
 
 
