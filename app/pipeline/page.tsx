@@ -17,6 +17,27 @@ import { useToast } from "@/hooks/use-toast"
 
 const generateRunId = () => `run-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`
 
+type ParsedPipelineError = {
+  headline: string
+  reason: string | null
+  references: string[]
+}
+
+const parsePipelineErrorMessage = (message: string): ParsedPipelineError => {
+  const [main, filesPart] = message.split(" Related files:")
+  const trimmedMain = main.trim()
+  const colonIndex = trimmedMain.indexOf(":")
+  const headline = colonIndex >= 0 ? trimmedMain.slice(0, colonIndex).trim() : trimmedMain
+  const reason = colonIndex >= 0 ? trimmedMain.slice(colonIndex + 1).trim() : null
+  const references = filesPart
+    ? filesPart
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    : []
+  return { headline, reason, references }
+}
+
 export default function PipelinePage() {
   const initialRunId = useMemo(() => generateRunId(), [])
   const [runId, setRunId] = useState(initialRunId)
@@ -30,6 +51,8 @@ export default function PipelinePage() {
   const [isUploadingDataFiles, setIsUploadingDataFiles] = useState(false)
   const [isUploadingSlaFiles, setIsUploadingSlaFiles] = useState(false)
   const { toast } = useToast()
+
+  const parsedPipelineError = pipelineError ? parsePipelineErrorMessage(pipelineError) : null
 
   const dataFileInputRef = useRef<HTMLInputElement>(null)
   const slaFileInputRef = useRef<HTMLInputElement>(null)
@@ -392,9 +415,27 @@ export default function PipelinePage() {
                   {pipelineError ? (
                     <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-4">
                       <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
-                      <div>
-                        <p className="font-medium text-destructive">Pipeline call failed</p>
-                        <p className="text-sm text-destructive/80">{pipelineError}</p>
+                      <div className="space-y-1">
+                        <p className="font-medium text-destructive">
+                          {parsedPipelineError?.headline || "Pipeline call failed"}
+                        </p>
+                        {parsedPipelineError?.reason ? (
+                          <p className="text-sm text-destructive/80">{parsedPipelineError.reason}</p>
+                        ) : (
+                          <p className="text-sm text-destructive/80">{pipelineError}</p>
+                        )}
+                        {parsedPipelineError?.references?.length ? (
+                          <div className="pt-1">
+                            <p className="text-xs font-medium text-destructive/60">Related files</p>
+                            <ul className="mt-1 space-y-1 text-xs text-destructive/60">
+                              {parsedPipelineError.references.map((reference) => (
+                                <li key={reference}>
+                                  <code className="break-all">{reference}</code>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}
