@@ -284,8 +284,27 @@ class MindQAPI {
     return this.post(`/v1/runs/${runId}/phases/07/llm-summary`, request)
   }
 
-  async runFullPipeline(runId: string, request: PipelineRequest): Promise<PipelineResponse> {
-    return this.post(`/v1/runs/${runId}/pipeline/full`, request)
+  async runFullPipeline(
+    runId: string,
+    request: PipelineRequest,
+    options?: { asyncMode?: boolean },
+  ): Promise<PipelineResponse | null> {
+    const query = options?.asyncMode ? "?async_mode=true" : ""
+    const response = await fetch(this.buildURL(`/v1/runs/${runId}/pipeline/full${query}`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(request),
+    })
+
+    if (response.status === 202) {
+      // Pipeline accepted for asynchronous processing
+      return null
+    }
+
+    return this.handleResponse<PipelineResponse>(response)
   }
 
   async listRuns(artifactsRoot?: string): Promise<RunListResponse> {

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useMemo } from "react"
+import { useState, useRef, useMemo, useEffect, useCallback } from "react"
 import type { PipelineResponse } from "@/lib/api"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
@@ -56,6 +56,91 @@ export default function PipelinePage() {
 
   const dataFileInputRef = useRef<HTMLInputElement>(null)
   const slaFileInputRef = useRef<HTMLInputElement>(null)
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pollingRunIdRef = useRef<string | null>(null)
+  const isMountedRef = useRef(true)
+
+  const stopPolling = useCallback(() => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current)
+      pollTimeoutRef.current = null
+    }
+    pollingRunIdRef.current = null
+  }, [])
+
+  const pollPipelineCompletion = useCallback(
+    (targetRunId: string) => {
+      stopPolling()
+      pollingRunIdRef.current = targetRunId
+      const maxAttempts = 180
+      const intervalMs = 10000
+      let attempts = 0
+
+      const poll = async () => {
+        if (!isMountedRef.current || pollingRunIdRef.current !== targetRunId) {
+          return
+        }
+        attempts += 1
+        try {
+          const artifacts = await api.listRunArtifacts(targetRunId)
+          const phases = artifacts.phases ?? []
+          const hasBiPhase = phases.some((phase) => phase.id === "stage_10_bi")
+          if (hasBiPhase) {
+            stopPolling()
+            if (!isMountedRef.current) {
+              return
+            }
+            setIsRunning(false)
+            setPipelineError(null)
+            setPipelineResult({
+              run_id: artifacts.run_id,
+              phases: phases.map((phase) => ({
+                phase: phase.id,
+                label: phase.label,
+                files: phase.files,
+              })) as Array<Record<string, unknown>>,
+            })
+            toast({
+              title: "Pipeline Completed",
+              description: `Pipeline ${targetRunId} finished successfully.`,
+            })
+            return
+          }
+        } catch (error) {
+          console.error("[v0] Polling pipeline status failed:", error)
+        }
+
+        if (attempts >= maxAttempts) {
+          stopPolling()
+          if (!isMountedRef.current) {
+            return
+          }
+          setPipelineResult(null)
+          setIsRunning(false)
+          setPipelineError("Pipeline is still running or failed. Please review artifacts for details.")
+          toast({
+            title: "Pipeline status timed out",
+            description: `Unable to confirm completion for ${targetRunId}. Check the pipeline artifacts.`,
+            variant: "destructive",
+          })
+          return
+        }
+
+        pollTimeoutRef.current = setTimeout(poll, intervalMs)
+      }
+
+      pollTimeoutRef.current = setTimeout(poll, 0)
+    },
+    [stopPolling, toast],
+  )
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      stopPolling()
+    }
+  }, [stopPolling])
 
   const addDataFile = () => {
     dataFileInputRef.current?.click()
@@ -180,28 +265,45 @@ export default function PipelinePage() {
       return
     }
 
+    stopPolling()
     setIsRunning(true)
     setPipelineResult(null)
     setPipelineError(null)
     console.log("[v0] Starting pipeline execution...")
 
-    try {
-      const result = await api.runFullPipeline(trimmedRunId, {
-        data_files: dataFiles.filter((f) => f.trim()),
-        sla_files: slaFiles.filter((f) => f.trim()),
-        stop_on_error: stopOnError,
-        llm_summary: llmSummary,
-      })
+    let acceptedAsync = false
 
-      console.log("[v0] Pipeline execution successful:", result)
-      setPipelineResult(result)
-      setPipelineError(null)
-      toast({
-        title: "Pipeline Started",
-        description: `Pipeline ${result.run_id} is now running`,
-      })
+    try {
+      const result = await api.runFullPipeline(
+        trimmedRunId,
+        {
+          data_files: dataFiles.filter((f) => f.trim()),
+          sla_files: slaFiles.filter((f) => f.trim()),
+          stop_on_error: stopOnError,
+          llm_summary: llmSummary,
+        },
+        { asyncMode: true },
+      )
+
+      if (result === null) {
+        acceptedAsync = true
+        toast({
+          title: "Pipeline Accepted",
+          description: `Pipeline ${trimmedRunId} is running in the background.`,
+        })
+        pollPipelineCompletion(trimmedRunId)
+      } else {
+        console.log("[v0] Pipeline execution successful:", result)
+        setPipelineResult(result)
+        setPipelineError(null)
+        toast({
+          title: "Pipeline Completed",
+          description: `Pipeline ${result.run_id} finished successfully.`,
+        })
+      }
     } catch (error) {
       console.error("[v0] Pipeline execution failed:", error)
+      stopPolling()
       setPipelineResult(null)
       setPipelineError(error instanceof Error ? error.message : "Unknown error occurred")
       toast({
@@ -210,7 +312,9 @@ export default function PipelinePage() {
         variant: "destructive",
       })
     } finally {
-      setIsRunning(false)
+      if (!acceptedAsync) {
+        setIsRunning(false)
+      }
       console.log("[v0] Pipeline execution completed")
     }
   }
