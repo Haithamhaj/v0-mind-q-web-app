@@ -49,7 +49,25 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
   const kpis = useKpiCalculations(dataset);
 
   const formattedCount = useMemo(() => dataset.length.toLocaleString("ar-SA"), [dataset.length]);
-  const formattedUpdatedAt = formatRunTimestamp(runInfo?.updatedAt);
+  const kpiUpdatedAt = useMemo(
+    () => formatRunTimestamp(kpis.lastUpdated ?? runInfo?.updatedAt),
+    [kpis.lastUpdated, runInfo?.updatedAt],
+  );
+  const deliveredOrders = useMemo(() => {
+    if (kpis.totalOrders !== null && kpis.slaPct !== null) {
+      return Math.round(kpis.totalOrders * (kpis.slaPct / 100));
+    }
+    return null;
+  }, [kpis.totalOrders, kpis.slaPct]);
+  const formatHours = useCallback(
+    (value: number | null | undefined) => {
+      if (value === null || value === undefined || Number.isNaN(value)) {
+        return "—";
+      }
+      return `${value.toFixed(1)} ساعة`;
+    },
+    [],
+  );
 
   const chartMetrics = useMemo(() => {
     if (!dataset || dataset.length === 0) {
@@ -177,9 +195,9 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
               {runInfo.runId}
             </Badge>
           )}
-          {formattedUpdatedAt && (
+          {kpiUpdatedAt && (
             <Badge variant="secondary" className="text-xs">
-              آخر تحديث: {formattedUpdatedAt}
+              آخر تحديث: {kpiUpdatedAt}
             </Badge>
           )}
           <Badge variant="secondary" className="flex items-center gap-2 px-3 py-1 text-xs">
@@ -197,77 +215,69 @@ const StoryBIDashboard: React.FC<StoryBIDashboardProps> = ({ runInfo }) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(kpis.totalOrders)}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              إجمالي الطلبات في الفترة الحالية
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <div>آخر تحديث: {kpiUpdatedAt ?? '—'}</div>
+              <div>المنطقة الزمنية: {kpis.timezone ?? 'Asia/Riyadh'}</div>
+              <div>العملة: {kpis.currency ?? 'SAR'}</div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-green-500/20 bg-gradient-to-br from-card to-green-500/5 transition-all duration-300 hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">إيرادات الطلبات</CardTitle>
+            <CardTitle className="text-sm font-medium">تحصيل COD</CardTitle>
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(kpis.totalRevenue)}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Activity className="mr-1 h-3 w-3" />
-              متوسط قيمة الطلب: {formatCurrency(kpis.avgOrderValue)}
-            </div>
+            <div className="text-2xl font-bold">{formatCurrency(kpis.codTotal)}</div>
+            <div className="mt-2 text-xs text-muted-foreground">متوسط تذكرة COD: {formatCurrency(kpis.codAvg)}</div>
           </CardContent>
         </Card>
 
         <Card className="border-orange-500/20 bg-gradient-to-br from-card to-orange-500/5 transition-all duration-300 hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">نسبة الدفع عند الاستلام</CardTitle>
-            <DollarSign className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm font-medium">مؤشرات الخدمة</CardTitle>
+            <Activity className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatPercentage(kpis.codRate)}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Activity className="mr-1 h-3 w-3" />
-              متوسط تحصيل COD: {formatCurrency(kpis.avgCodAmount)}
-            </div>
+            <div className="text-2xl font-bold">{formatPercentage(kpis.slaPct)}</div>
+            <div className="mt-2 text-xs text-muted-foreground">معدل RTO: {formatPercentage(kpis.rtoPct)}</div>
           </CardContent>
         </Card>
 
         <Card className="border-purple-500/20 bg-gradient-to-br from-card to-purple-500/5 transition-all duration-300 hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">أبرز الوجهات</CardTitle>
+            <CardTitle className="text-sm font-medium">زمن التنفيذ</CardTitle>
             <MapPin className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold truncate">{kpis.topDestination}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              معدل التسليم: {formatPercentage(kpis.deliveryRate)}
-            </div>
+            <div className="text-2xl font-bold">{formatHours(kpis.leadTimeP50)}</div>
+            <div className="mt-2 text-xs text-muted-foreground">P90: {formatHours(kpis.leadTimeP90)}</div>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>ملخص الأداء التشغيلي</CardTitle>
-          <CardDescription>مقاييس أساسية لمتابعة الطلبات وتحويلات الدفع.</CardDescription>
+          <CardTitle>ملخص مؤشرات التشغيل</CardTitle>
+          <CardDescription>قياس سريع لأهم مؤشرات الأداء بعد المعالجة.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-lg bg-muted/50 p-4">
-              <div className="text-sm text-muted-foreground">الطلبات المُسلمة</div>
-              <div className="text-xl font-semibold">{formatNumber(kpis.deliveredOrders)}</div>
+              <div className="text-sm text-muted-foreground">الطلبات الموصلة تقديرًا</div>
+              <div className="text-xl font-semibold">{formatNumber(deliveredOrders)}</div>
               <div className="text-xs text-green-600">من أصل {formatNumber(kpis.totalOrders)} طلب</div>
             </div>
             <div className="rounded-lg bg-muted/50 p-4">
-              <div className="text-sm text-muted-foreground">معدل التسليم</div>
-              <div className="text-xl font-semibold">{formatPercentage(kpis.deliveryRate)}</div>
-              <div className="text-xs text-blue-600">يشمل الحالات الناجحة فقط</div>
+              <div className="text-sm text-muted-foreground">معدل COD</div>
+              <div className="text-xl font-semibold">{formatPercentage(kpis.codRatePct)}</div>
+              <div className="text-xs text-blue-600">يعتمد على المارت التشغيلي</div>
             </div>
             <div className="rounded-lg bg-muted/50 p-4">
-              <div className="text-sm text-muted-foreground">متوسط قيمة الطلب</div>
-              <div className="text-xl font-semibold">{formatCurrency(kpis.avgOrderValue)}</div>
-              <div className="text-xs text-purple-600">يشمل كل طرق الدفع</div>
+              <div className="text-sm text-muted-foreground">زمن التنفيذ P90</div>
+              <div className="text-xl font-semibold">{formatHours(kpis.leadTimeP90)}</div>
+              <div className="text-xs text-purple-600">مرجع لسقف زمن التسليم</div>
             </div>
           </div>
         </CardContent>
