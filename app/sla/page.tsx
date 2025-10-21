@@ -329,20 +329,22 @@ function improvementIdeasFromSla(data?: SlaPayload): string[] {
   const ideas = new Set<string>()
   data.metrics.forEach((metric) => {
     if (metric.status === "warn") {
-      ideas.add(`راجع خطة التحسين لمؤشر ${metric.label} قبل تجاوز الحد الحرج.`)
+      ideas.add(`ضبط مسار مؤشر ${metric.label}: أبلغ فريق العمليات بخطة تصحيح خلال 24 ساعة قبل تجاوز الحد.`)
     }
     if (metric.status === "stop") {
-      ideas.add(`استجب فورًا لفشل مؤشر ${metric.label}. استخدم العتبات ${JSON.stringify(metric.thresholds ?? {})}.`)
+      ideas.add(`مؤشر ${metric.label} متجاوز للحد الحرج؛ يتطلب جلسة طوارئ مع المالك التنفيذي وتحديد مسار استعادة.`)
     }
   })
-  ;(data.gate?.reasons ?? []).forEach((reason) => ideas.add(`سبب من مرحلة 09: ${reason}. وثّق الإجراء التصحيحي.`))
+  ;(data.gate?.reasons ?? []).forEach((reason) =>
+    ideas.add(`سبب بوابة الاعتماد: ${reason}. عيّن مسؤول متابعة وحدد تاريخ إغلاق موثق.`),
+  )
   data.rule_failures.forEach((rule) => {
     if (rule.rule_id) {
-      ideas.add(`تحقق من القاعدة ${rule.rule_id} (${rule.level}) ومعالجة السبب: ${rule.message}.`)
+      ideas.add(`راجع قاعدة ${rule.rule_id} (${rule.level}) وأعد ضبط الضوابط لضمان عدم تكرار السبب: ${rule.message}.`)
     }
   })
   if (!ideas.size) {
-    ideas.add("لا توجد ملاحظات حرجة حاليًا. استمر في مراقبة المؤشرات للحفاظ على الامتثال.")
+    ideas.add("لا توجد إنذارات حالية. استمر في مراقبة الأداء وحافظ على جلسة متابعة أسبوعية للمستهدفات.")
   }
   return Array.from(ideas)
 }
@@ -382,26 +384,26 @@ const SlaPage: React.FC = () => {
 
   const quickSuggestions = useMemo(() => {
     const suggestions = new Set<string>()
-    suggestions.add("ما هي نسبة الالتزام الحالية؟")
-    suggestions.add("ما التوصيات لتحسين SLA؟")
+    suggestions.add("قدم ملخصًا تنفيذيًا لنسبة الامتثال الحالية.")
+    suggestions.add("ما الإجراءات التصحيحية ذات الأولوية القصوى؟")
 
     if (slaData?.metrics.some((metric) => metric.status === "warn" || metric.status === "stop")) {
-      suggestions.add("ما أسباب التحذيرات أو التوقف الحالي؟")
+      suggestions.add("فسر أسباب التحذيرات الحالية وكيفية إغلاقها.")
     }
     if (slaData?.gate?.reasons?.length) {
-      suggestions.add("ما أسباب رفض بوابة الاعتماد؟")
+      suggestions.add("ما العوائق الرئيسية في بوابة الاعتماد وكيف نعالجها؟")
     }
     if (slaData?.documents?.length) {
-      suggestions.add("ما حالة وثائق SLA الحالية؟")
+      suggestions.add("ما حالة وثائق SLA الرسمية وأهم بنودها؟")
     }
     if (sopData?.expectations?.length) {
-      suggestions.add("ما هي الأهداف الرسمية في مستندات SOP؟")
+      suggestions.add("ما الأهداف الكمية المستخرجة من وثائق SOP؟")
     }
     if (gapData?.analysis?.analysis?.some((item) => (item.delta ?? 0) < 0)) {
-      suggestions.add("ما الفجوات الحالية مقارنة بالأهداف؟")
+      suggestions.add("حدد أكبر فجوات الأداء مقارنة بالمستهدف.")
     }
     if (gapData?.recommendations?.length) {
-      suggestions.add("ما خطة العمل المقترحة من التحليل؟")
+      suggestions.add("لخّص خطة العمل المقترحة لإغلاق الفجوات.")
     }
 
     return Array.from(suggestions).slice(0, 4)
@@ -825,8 +827,8 @@ const SlaPage: React.FC = () => {
 
               <Card className="transition hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle>تحليل الفجوات مقابل SOP</CardTitle>
-                  <CardDescription>مقارنة القيم الحالية بالأهداف التعاقدية</CardDescription>
+                  <CardTitle>الفجوات مقابل المستهدفات</CardTitle>
+                  <CardDescription>تحليل الفروق بين الأداء الفعلي ومتطلبات SOP</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
                   {gapLoading ? (
@@ -846,18 +848,18 @@ const SlaPage: React.FC = () => {
                         return (
                           <div key={item.metric_id} className="rounded-lg border border-border/40 bg-card/40 p-3">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="font-semibold text-foreground">{item.metric_label ?? item.metric_id}</div>
+                          <div className="font-semibold text-foreground">{item.metric_label ?? item.metric_id}</div>
                               <Badge variant="outline">{item.status ?? "غير محدد"}</Badge>
                             </div>
                             <div className="text-xs">
-                              الحالي:{" "}
+                              الأداء الحالي:{" "}
                               {actualValue != null && Number.isFinite(actualValue) ? actualValue.toFixed(3) : "—"} | الهدف:{" "}
                               {targetValue != null && Number.isFinite(targetValue)
                                 ? targetValue.toFixed(3) + (item.target_unit ? ` ${item.target_unit}` : "")
                                 : "غير محدد"}
                             </div>
                             <div className="text-xs">
-                              الفارق:{" "}
+                              الفارق عن المستهدف:{" "}
                               {deltaValue != null && Number.isFinite(deltaValue)
                                 ? `${deltaValue >= 0 ? "+" : ""}${deltaValue.toFixed(3)}`
                                 : "غير محسوب"}
@@ -899,7 +901,7 @@ const SlaPage: React.FC = () => {
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
                   <CardTitle>مساعد الامتثال</CardTitle>
-                  <CardDescription>يستخدم بيانات SLA الحالية فقط للإجابة</CardDescription>
+                  <CardDescription>يولّد إجابات تنفيذية اعتمادًا على أحدث بيانات SLA والـ SOP</CardDescription>
                 </div>
                 <Bot className="h-5 w-5 text-primary" />
               </CardHeader>
@@ -922,7 +924,7 @@ const SlaPage: React.FC = () => {
                 )}
                 <div className="space-y-3">
                   <Textarea
-                    placeholder="اكتب سؤالك حول الامتثال..."
+                    placeholder="اطلب تلخيصًا أو خطة عمل تتعلق بالامتثال..."
                     value={assistantInput}
                     onChange={(event) => setAssistantInput(event.target.value)}
                     rows={4}
@@ -938,7 +940,7 @@ const SlaPage: React.FC = () => {
                 <div className="space-y-2">
                   {assistantHistory.length === 0 ? (
                     <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-sm text-muted-foreground">
-                      اطرح سؤالاً حول مؤشرات SLA وسيقوم المساعد بتلخيص الوضع واقتراح إجراءات عملية.
+                      اطلب مثلاً: "قدم ملخصًا تنفيذيًا للامتثال وأبرز مخاطر الأسبوع" أو "حدد خطة إغلاق فجوة التسليم في الرياض".
                     </div>
                   ) : (
                     <div className="space-y-3">
