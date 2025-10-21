@@ -30,12 +30,34 @@ export interface PipelineRequest {
   sla_files?: string[]
   artifacts_root?: string
   stop_on_error?: boolean
+  llm_credentials_file?: string
   llm_summary?: boolean
 }
 
 export interface PipelineResponse {
   run_id: string
   phases: Array<Record<string, unknown>>
+}
+
+export type PipelinePhaseStatus = "pending" | "running" | "completed" | "skipped"
+
+export interface PipelineProgressPhase {
+  id: string
+  label: string
+  status: PipelinePhaseStatus
+  index: number
+}
+
+export interface PipelineProgress {
+  status: "running" | "completed" | "failed"
+  current_phase?: string | null
+  completed_count: number
+  total_count: number
+  percent_complete: number
+  phases: PipelineProgressPhase[]
+  updated_at: string
+  skipped?: string[]
+  error?: string
 }
 
 export interface BiMartPreview {
@@ -315,6 +337,11 @@ class MindQAPI {
   async listRunArtifacts(runId: string, artifactsRoot?: string): Promise<RunArtifactsResponse> {
     const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
     return this.get(`/v1/runs/${runId}/artifacts${query}`)
+  }
+
+  async getPipelineStatus(runId: string, artifactsRoot?: string): Promise<PipelineProgress> {
+    const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
+    return this.get(`/v1/runs/${runId}/pipeline/status${query}`)
   }
 
   async getBiMetric(runId: string, metricId: string, artifactsRoot?: string): Promise<BiMetricResponse> {

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useMemo, useEffect, useCallback } from "react"
-import type { PipelineResponse } from "@/lib/api"
+import type { PipelinePhaseStatus, PipelineProgress, PipelineResponse } from "@/lib/api"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,11 +11,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Progress } from "@/components/ui/progress"
 import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
 const generateRunId = () => `run-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`
+
+const PHASE_STATUS_LABELS: Record<PipelinePhaseStatus, string> = {
+  pending: "Pending",
+  running: "Running",
+  completed: "Completed",
+  skipped: "Skipped",
+}
 
 type ParsedPipelineError = {
   headline: string
@@ -48,6 +56,7 @@ export default function PipelinePage() {
   const [isRunning, setIsRunning] = useState(false)
   const [pipelineResult, setPipelineResult] = useState<PipelineResponse | null>(null)
   const [pipelineError, setPipelineError] = useState<string | null>(null)
+  const [pipelineProgress, setPipelineProgress] = useState<PipelineProgress | null>(null)
   const [isUploadingDataFiles, setIsUploadingDataFiles] = useState(false)
   const [isUploadingSlaFiles, setIsUploadingSlaFiles] = useState(false)
   const { toast } = useToast()
@@ -72,8 +81,8 @@ export default function PipelinePage() {
     (targetRunId: string) => {
       stopPolling()
       pollingRunIdRef.current = targetRunId
-      const maxAttempts = 180
-      const intervalMs = 10000
+      const maxAttempts = 240
+      const intervalMs = 5000
       let attempts = 0
 
       const poll = async () => {
@@ -82,24 +91,45 @@ export default function PipelinePage() {
         }
         attempts += 1
         try {
-          const artifacts = await api.listRunArtifacts(targetRunId)
-          const phases = artifacts.phases ?? []
-          const hasBiPhase = phases.some((phase) => phase.id === "stage_10_bi")
-          if (hasBiPhase) {
+          const status = await api.getPipelineStatus(targetRunId)
+          if (!isMountedRef.current || pollingRunIdRef.current !== targetRunId) {
+            return
+          }
+          setPipelineProgress(status)
+
+          if (status.status === "failed") {
             stopPolling()
-            if (!isMountedRef.current) {
-              return
+            setIsRunning(false)
+            const message = status.error ?? `Pipeline ${targetRunId} failed.`
+            setPipelineError(message)
+            toast({
+              title: "Pipeline Failed",
+              description: message,
+              variant: "destructive",
+            })
+            return
+          }
+
+          if (status.status === "completed") {
+            stopPolling()
+            try {
+              const artifacts = await api.listRunArtifacts(targetRunId)
+              if (isMountedRef.current) {
+                const phases = artifacts.phases ?? []
+                setPipelineError(null)
+                setPipelineResult({
+                  run_id: artifacts.run_id,
+                  phases: phases.map((phase) => ({
+                    phase: phase.id,
+                    label: phase.label,
+                    files: phase.files,
+                  })) as Array<Record<string, unknown>>,
+                })
+              }
+            } catch (artifactError) {
+              console.error("[v0] Fetching run artifacts failed:", artifactError)
             }
             setIsRunning(false)
-            setPipelineError(null)
-            setPipelineResult({
-              run_id: artifacts.run_id,
-              phases: phases.map((phase) => ({
-                phase: phase.id,
-                label: phase.label,
-                files: phase.files,
-              })) as Array<Record<string, unknown>>,
-            })
             toast({
               title: "Pipeline Completed",
               description: `Pipeline ${targetRunId} finished successfully.`,
@@ -115,7 +145,6 @@ export default function PipelinePage() {
           if (!isMountedRef.current) {
             return
           }
-          setPipelineResult(null)
           setIsRunning(false)
           setPipelineError("Pipeline is still running or failed. Please review artifacts for details.")
           toast({
@@ -141,6 +170,13 @@ export default function PipelinePage() {
       stopPolling()
     }
   }, [stopPolling])
+
+  const progressPercent = pipelineProgress ? Math.round((pipelineProgress.percent_complete ?? 0) * 100) : 0
+  const currentPhaseLabel =
+    pipelineProgress && pipelineProgress.current_phase
+      ? pipelineProgress.phases.find((phase) => phase.id === pipelineProgress.current_phase)?.label ??
+        pipelineProgress.current_phase
+      : null
 
   const addDataFile = () => {
     dataFileInputRef.current?.click()
@@ -269,6 +305,7 @@ export default function PipelinePage() {
     setIsRunning(true)
     setPipelineResult(null)
     setPipelineError(null)
+    setPipelineProgress(null)
     console.log("[v0] Starting pipeline execution...")
 
     let acceptedAsync = false
@@ -291,11 +328,23 @@ export default function PipelinePage() {
           title: "Pipeline Accepted",
           description: `Pipeline ${trimmedRunId} is running in the background.`,
         })
+        try {
+          const statusSnapshot = await api.getPipelineStatus(trimmedRunId)
+          setPipelineProgress(statusSnapshot)
+        } catch (statusError) {
+          console.debug("[v0] Initial status fetch failed (expected if run just started):", statusError)
+        }
         pollPipelineCompletion(trimmedRunId)
       } else {
         console.log("[v0] Pipeline execution successful:", result)
         setPipelineResult(result)
         setPipelineError(null)
+        try {
+          const statusSnapshot = await api.getPipelineStatus(result.run_id)
+          setPipelineProgress(statusSnapshot)
+        } catch (statusError) {
+          console.debug("[v0] Unable to read pipeline status after completion:", statusError)
+        }
         toast({
           title: "Pipeline Completed",
           description: `Pipeline ${result.run_id} finished successfully.`,
@@ -306,6 +355,7 @@ export default function PipelinePage() {
       stopPolling()
       setPipelineResult(null)
       setPipelineError(error instanceof Error ? error.message : "Unknown error occurred")
+      setPipelineProgress(null)
       toast({
         title: "Pipeline Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
@@ -347,6 +397,68 @@ export default function PipelinePage() {
               <h1 className="text-3xl font-bold text-foreground">Full Pipeline Execution</h1>
               <p className="text-muted-foreground">Configure and run the complete Mind-Q pipeline</p>
             </div>
+
+            {pipelineProgress && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pipeline Progress</CardTitle>
+                  <CardDescription>
+                    {pipelineProgress.status === "completed"
+                      ? `Run ${runId} completed successfully.`
+                      : pipelineProgress.status === "failed"
+                        ? `Run ${runId} encountered an error.`
+                        : `Tracking run ${runId}.`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      {pipelineProgress.status === "completed"
+                        ? "Completed"
+                        : pipelineProgress.status === "failed"
+                          ? "Failed"
+                          : currentPhaseLabel
+                              ? `Running: ${currentPhaseLabel}`
+                              : "Running"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">{progressPercent}%</div>
+                  </div>
+                  <Progress value={progressPercent} aria-label="Pipeline progress" />
+                  <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {pipelineProgress.phases.map((phase) => {
+                      const statusLabel = PHASE_STATUS_LABELS[phase.status]
+                      const statusClasses =
+                        phase.status === "completed"
+                          ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-600"
+                          : phase.status === "running"
+                            ? "border-primary/60 bg-primary/10 text-primary"
+                            : phase.status === "skipped"
+                              ? "border-border bg-muted/40 text-muted-foreground"
+                              : "border-border text-muted-foreground"
+                      return (
+                        <div
+                          key={phase.id}
+                          className={`rounded-md border px-3 py-2 text-xs transition-colors ${statusClasses}`}
+                        >
+                          <div className="flex items-center justify-between text-[0.7rem] uppercase tracking-wide">
+                            <span className="font-semibold">
+                              #{phase.index.toString().padStart(2, "0")}
+                            </span>
+                            <span>{statusLabel}</span>
+                          </div>
+                          <div className="mt-1 text-sm font-medium">{phase.label}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {pipelineProgress.error && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                      {pipelineProgress.error}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
