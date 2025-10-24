@@ -15,6 +15,7 @@ import { AlertTriangle, Loader2, Play, Plus, Sparkles, X } from "lucide-react"
 import { api, type BiPhaseResponse, type PhaseRequest } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { BiChart } from "@/components/bi-chart"
+import { useLanguage } from "@/context/language-context"
 
 const phases = [
   { id: "01", name: "Ingestion", desc: "Multi-file CSV/Parquet ingestion and SLA processing" },
@@ -33,6 +34,7 @@ const generateRunId = () => `phase-${new Date().toISOString().replace(/[-:.TZ]/g
 
 export default function PhasesPage(): React.JSX.Element {
   const initialRunId = useMemo(() => generateRunId(), [])
+  const { translate } = useLanguage()
   const [selectedPhase, setSelectedPhase] = useState("01")
   const [runId, setRunId] = useState(initialRunId)
   const [dataFiles, setDataFiles] = useState<string[]>([])

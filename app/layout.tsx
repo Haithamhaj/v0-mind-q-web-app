@@ -5,6 +5,9 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import "./globals.css"
+import { LanguageProvider } from "@/context/language-context"
+import { HelpProvider } from "@/components/help/help-context"
+import { HelpPanel } from "@/components/help/help-panel"
 
 export const metadata: Metadata = {
   title: "Mind-Q V4 | Logistics Intelligence Platform",
@@ -19,10 +22,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ar" dir="rtl" className="dark">
+    <html lang="ar" dir="rtl" className="dark" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-        <Suspense fallback={null}>{children}</Suspense>
-        <Analytics />
+        <LanguageProvider>
+          <HelpProvider>
+            <Suspense fallback={null}>{children}</Suspense>
+            <Analytics />
+            <HelpPanel />
+          </HelpProvider>
+        </LanguageProvider>
       </body>
     </html>
   )

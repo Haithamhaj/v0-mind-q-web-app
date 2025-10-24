@@ -1,15 +1,18 @@
 "use client"
 
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { HelpTrigger } from "@/components/help/help-trigger"
+import { useHelpCenter } from "@/components/help/help-context"
+import { useLanguage } from "@/context/language-context"
 import { api, PipelineRunInfo } from "@/lib/api"
 import { AlertCircle, CheckCircle2, Loader2, MessageSquare, RefreshCw, XCircle } from "lucide-react"
 
@@ -50,11 +53,14 @@ interface SlaPayload {
 
 type ChatMessage = { role: "user" | "assistant"; content: string; source?: "local" | "system" | "llm" }
 
-const statusPalette: Record<MetricStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  pass: { label: "ضمن الحد", color: "text-secondary", icon: <CheckCircle2 className="h-4 w-4 text-secondary" /> },
-  warn: { label: "تحذير", color: "text-amber-500", icon: <AlertCircle className="h-4 w-4 text-amber-500" /> },
-  stop: { label: "إيقاف", color: "text-destructive", icon: <XCircle className="h-4 w-4 text-destructive" /> },
-  unknown: { label: "غير محدد", color: "text-muted-foreground", icon: <AlertCircle className="h-4 w-4 text-muted-foreground" /> },
+const statusPaletteConfig: Record<
+  MetricStatus,
+  { labelKey: string; colorClass: string; iconClass: string; Icon: typeof CheckCircle2 }
+> = {
+  pass: { labelKey: "Within threshold", colorClass: "text-secondary", iconClass: "text-secondary", Icon: CheckCircle2 },
+  warn: { labelKey: "Warning threshold", colorClass: "text-amber-500", iconClass: "text-amber-500", Icon: AlertCircle },
+  stop: { labelKey: "Stop threshold", colorClass: "text-destructive", iconClass: "text-destructive", Icon: XCircle },
+  unknown: { labelKey: "Not specified", colorClass: "text-muted-foreground", iconClass: "text-muted-foreground", Icon: AlertCircle },
 }
 
 const normalizeStatus = (status?: string | null): MetricStatus => {
@@ -134,6 +140,24 @@ const SlaPage: React.FC = () => {
   const [assistantHistory, setAssistantHistory] = useState<ChatMessage[]>([])
   const [assistantLoading, setAssistantLoading] = useState(false)
   const [assistantError, setAssistantError] = useState<string | undefined>()
+
+  const { translate } = useLanguage()
+  const { openTopic } = useHelpCenter()
+  const assistantSectionRef = useRef<HTMLDivElement | null>(null)
+  const statusPalette = useMemo<Record<MetricStatus, { label: string; color: string; icon: JSX.Element }>>(() => {
+    const entries = {} as Record<MetricStatus, { label: string; color: string; icon: JSX.Element }>
+    (Object.entries(statusPaletteConfig) as Array<[MetricStatus, (typeof statusPaletteConfig)[MetricStatus]]>).forEach(
+      ([key, config]) => {
+        const IconComponent = config.Icon
+        entries[key] = {
+          label: translate(config.labelKey),
+          color: config.colorClass,
+          icon: <IconComponent className={`h-4 w-4 ${config.iconClass}`} />,
+        }
+      },
+    )
+    return entries
+  }, [translate])
 
   const currentRunParam = selectedRun ?? "run-latest"
 
@@ -238,9 +262,62 @@ const SlaPage: React.FC = () => {
         <main className="flex-1 overflow-y-auto bg-background p-6">
           <div className="mx-auto flex max-w-5xl flex-col gap-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">لوحة متابعة اتفاقيات مستوى الخدمة (SLA)</h1>
-                <p className="text-muted-foreground">نظرة تنفيذية لأداء الامتثال وتوصيات التدخل السريع.</p>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <div>
+                    <h1 className="text-3xl font-bold text-foreground">{translate("SLA compliance command center")}</h1>
+                    <p className="text-muted-foreground">{translate("Executive overview of contractual adherence and quick intervention guidance.")}</p>
+                  </div>
+                  <HelpTrigger
+                    topicId="sla.overview"
+                    aria-label={translate("Explain the SLA dashboard")}
+                    buildTopic={() => {
+                      const runLabel = selectedRun ?? translate("Latest run")
+                      const gateStatusLabel =
+                        slaData?.gate?.status
+                          ? statusPalette[normalizeStatus(slaData.gate.status)].label
+                          : translate("Not specified")
+                      return {
+                        title: translate("SLA compliance overview"),
+                        summary: translate(
+                          "This dashboard links SLA policy documents with the automated checks from phases 09 and 10.",
+                        ),
+                        detailItems: [
+                          translate("Current run: {runId}", { runId: runLabel }),
+                          translate("Overall compliance score: {score}", {
+                            score: overallScore !== null ? `${(overallScore * 100).toFixed(1)}%` : translate("Awaiting data"),
+                          }),
+                          translate("Gate status: {status}", { status: gateStatusLabel }),
+                          translate("Last refreshed: {timestamp}", {
+                            timestamp: formattedGeneratedAt ?? translate("Awaiting data"),
+                          }),
+                        ],
+                        sources: [
+                          {
+                            label: translate("SLA Master Agreement"),
+                            description: translate(
+                              "Primary contractual obligations and penalties that govern the KPIs on this page.",
+                            ),
+                          },
+                          {
+                            label: translate("SOP - Logistics Quality v2024"),
+                            description: translate(
+                              "Defines delivery promises, incident thresholds, and escalation workflow feeding these metrics.",
+                            ),
+                          },
+                        ],
+                        suggestedQuestions: [
+                          translate("What is driving the current gate status?"),
+                          translate("Which contracts deteriorated most in this run?"),
+                          translate("What actions should we take before the next cycle?"),
+                        ],
+                        onAsk: () => {
+                          assistantSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                        },
+                      }
+                    }}
+                  />
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="w-56">
@@ -250,10 +327,12 @@ const SlaPage: React.FC = () => {
                     disabled={runsLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={runsLoading ? "جاري التحميل..." : "اختر تشغيلًا"} />
+                      <SelectValue
+                        placeholder={runsLoading ? translate("Loading runs...") : translate("Select a run")}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="run-latest">أحدث تشغيل</SelectItem>
+                      <SelectItem value="run-latest">{translate("Latest run")}</SelectItem>
                       {runs.map((run) => (
                         <SelectItem key={run.run_id} value={run.run_id}>
                           {run.run_id}
@@ -263,7 +342,7 @@ const SlaPage: React.FC = () => {
                   </Select>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setRefreshToken((token) => token + 1)} disabled={slaLoading}>
-                  <RefreshCw className="mr-2 h-4 w-4" /> تحديث
+                  <RefreshCw className="mr-2 h-4 w-4" /> {translate("Refresh")}
                 </Button>
               </div>
             </div>
@@ -273,7 +352,7 @@ const SlaPage: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
-                    تعذر تحميل قائمة التشغيل
+                    {translate("Unable to load run list")}
                   </CardTitle>
                   <CardDescription className="text-destructive">{runsError}</CardDescription>
                 </CardHeader>
@@ -285,7 +364,7 @@ const SlaPage: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
-                    تعذر تحميل مؤشرات الامتثال
+                    {translate("Unable to load SLA indicators")}
                   </CardTitle>
                   <CardDescription className="text-destructive">{slaError}</CardDescription>
                 </CardHeader>
@@ -294,24 +373,123 @@ const SlaPage: React.FC = () => {
 
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="border-secondary/20 bg-gradient-to-br from-card to-secondary/5 transition hover:shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <div>
-                    <CardTitle className="text-sm font-medium">{slaData?.overall.label ?? "معدل الامتثال العام"}</CardTitle>
-                    <CardDescription>قياس الالتزام الحالي مقابل المستهدف</CardDescription>
+                <CardHeader className="space-y-0 pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <CardTitle className="text-sm font-medium">{translate("Overall SLA compliance score")}</CardTitle>
+                      <CardDescription>{translate("Aggregated score comparing the current run with contractual targets.")}</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {statusPalette[normalizeStatus(slaData?.overall.status)].icon}
+                      <HelpTrigger
+                        topicId="sla.overall"
+                        aria-label={translate("Explain the overall compliance score")}
+                        buildTopic={() => {
+                          const runLabel = selectedRun ?? translate("Latest run")
+                          const overallStatus = statusPalette[normalizeStatus(slaData?.overall.status)]
+                          const targetScore =
+                            slaData?.overall.score != null ? `${(slaData.overall.score * 100).toFixed(1)}%` : translate("Not specified")
+                          return {
+                            title: translate("Overall SLA compliance score"),
+                            summary: translate(
+                              "Weighted combination of SLA metrics covering delivery punctuality, quality gates, and critical escalations.",
+                            ),
+                            detailItems: [
+                              translate("Current run: {runId}", { runId: runLabel }),
+                              translate("Recorded score: {score}", {
+                                score: overallScore !== null ? `${(overallScore * 100).toFixed(1)}%` : translate("Awaiting data"),
+                              }),
+                              translate("Status classification: {status}", { status: overallStatus.label }),
+                              translate("Target threshold: {target}", { target: targetScore }),
+                            ],
+                            sources: [
+                              {
+                                label: translate("SLA Master Agreement"),
+                                description: translate(
+                                  "Defines the contractual target for the combined SLA compliance score (section 3.2).",
+                                ),
+                              },
+                              {
+                                label: translate("SOP - Logistics Quality v2024"),
+                                description: translate(
+                                  "Explains the weighting between on-time delivery, incident resolution, and escalation metrics.",
+                                ),
+                              },
+                            ],
+                            suggestedQuestions: [
+                              translate("How is the compliance score calculated for this run?"),
+                              translate("Which KPI contributed most to the score change?"),
+                              translate("What corrective actions are recommended to lift the score?"),
+                            ],
+                            onAsk: () => {
+                              assistantSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                            },
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
-                  {statusPalette[normalizeStatus(slaData?.overall.status)].icon}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="text-2xl font-bold text-foreground">{overallScore !== null ? `${(overallScore * 100).toFixed(1)}%` : "—"}</div>
                   <Progress value={overallScore != null ? overallScore * 100 : 0} max={100} />
-                  {formattedGeneratedAt && <div className="text-xs text-muted-foreground">آخر تحديث: {formattedGeneratedAt}</div>}
+                  {formattedGeneratedAt ? (
+                    <div className="text-xs text-muted-foreground">
+                      {translate("Last refreshed: {timestamp}", { timestamp: formattedGeneratedAt })}
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
 
               <Card className="transition hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-sm font-medium">مؤشرات سريعة</CardTitle>
-                  <CardDescription>أبرز الأرقام التشغيلية لهذا التشغيل</CardDescription>
+                  <div className="space-y-1">
+                    <CardTitle className="text-sm font-medium">مؤشرات سريعة</CardTitle>
+                    <CardDescription>أبرز الأرقام التشغيلية لهذا التشغيل</CardDescription>
+                  </div>
+                  <CardAction>
+                    <HelpTrigger
+                      topicId="sla.performance"
+                      aria-label={translate("Explain the performance snapshot")}
+                      buildTopic={() => {
+                        const rows = slaData?.performance.rows
+                        const approvals = slaData?.performance.approve_pct
+                        const rejections = slaData?.performance.reject_pct
+                        const runtime = slaData?.performance.exec_seconds
+                        return {
+                          title: translate("Operational performance snapshot"),
+                          summary: translate("Quick view of processing volume and outcome ratios for the current run."),
+                          detailItems: [
+                            translate("Rows processed: {count}", {
+                              count: rows != null ? rows.toLocaleString() : translate("Not specified"),
+                            }),
+                            translate("Approval rate: {value}", {
+                              value: approvals != null ? `${(approvals * 100).toFixed(1)}%` : translate("Not specified"),
+                            }),
+                            translate("Rejection rate: {value}", {
+                              value: rejections != null ? `${(rejections * 100).toFixed(1)}%` : translate("Not specified"),
+                            }),
+                            translate("Execution time: {seconds} seconds", {
+                              seconds: runtime != null ? runtime.toFixed(1) : translate("Not specified"),
+                            }),
+                          ],
+                          sources: [
+                            {
+                              label: translate("ETL monitoring logs"),
+                              description: translate("Derived from BI pipeline performance metrics exported with each run."),
+                            },
+                          ],
+                          suggestedQuestions: [
+                            translate("Why did the approval rate change compared to the previous run?"),
+                            translate("Which inputs are causing the current rejection volume?"),
+                          ],
+                          onAsk: () => {
+                            assistantSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                          },
+                        }
+                      }}
+                    />
+                  </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <div>عدد السجلات: {slaData?.performance.rows ?? "—"}</div>
@@ -419,15 +597,16 @@ const SlaPage: React.FC = () => {
               </Card>
             </div>
 
-            <Card className="transition hover:shadow-lg">
-              <CardHeader>
-                <CardTitle>المساعد الذكي للامتثال</CardTitle>
+            <div ref={assistantSectionRef}>
+              <Card className="transition hover:shadow-lg">
+                <CardHeader>
+                  <CardTitle>المساعد الذكي للامتثال</CardTitle>
                 <CardDescription>يولّد إجابات تنفيذية اعتمادًا على أحدث بيانات SLA</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <Textarea
-                    placeholder="اطلب ملخصًا أو خطة عمل تتعلق بالامتثال..."
+                    placeholder={translate("Ask for an executive summary or a remediation plan about compliance...")}
                     value={assistantInput}
                     onChange={(event) => setAssistantInput(event.target.value)}
                     rows={4}
@@ -443,7 +622,7 @@ const SlaPage: React.FC = () => {
                 <div className="space-y-2">
                   {assistantHistory.length === 0 ? (
                     <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-sm text-muted-foreground">
-                      اطلب مثلاً: "قدّم ملخصًا تنفيذيًا للامتثال وأبرز المخاطر" أو "ما خطة تحسين نسبة التسليم في جدة؟".
+                      {translate("Try requesting an executive summary or a plan to improve delivery performance in a specific region.")}
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -462,7 +641,8 @@ const SlaPage: React.FC = () => {
                   )}
                 </div>
               </CardContent>
-            </Card>
+              </Card>
+            </div>
           </div>
         </main>
       </div>

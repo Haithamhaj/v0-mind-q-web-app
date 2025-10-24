@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { HelpTrigger } from "@/components/help/help-trigger"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -15,15 +16,9 @@ import { Progress } from "@/components/ui/progress"
 import { AlertTriangle, Play, Plus, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { useLanguage } from "@/context/language-context"
 
 const generateRunId = () => `run-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`
-
-const PHASE_STATUS_LABELS: Record<PipelinePhaseStatus, string> = {
-  pending: "Pending",
-  running: "Running",
-  completed: "Completed",
-  skipped: "Skipped",
-}
 
 type ParsedPipelineError = {
   headline: string
@@ -48,6 +43,7 @@ const parsePipelineErrorMessage = (message: string): ParsedPipelineError => {
 
 export default function PipelinePage() {
   const initialRunId = useMemo(() => generateRunId(), [])
+  const { translate } = useLanguage()
   const [runId, setRunId] = useState(initialRunId)
   const [dataFiles, setDataFiles] = useState<string[]>([])
   const [slaFiles, setSlaFiles] = useState<string[]>([])
@@ -60,6 +56,32 @@ export default function PipelinePage() {
   const [isUploadingDataFiles, setIsUploadingDataFiles] = useState(false)
   const [isUploadingSlaFiles, setIsUploadingSlaFiles] = useState(false)
   const { toast } = useToast()
+
+  const phaseStatusLabels = useMemo<Record<PipelinePhaseStatus, string>>(
+    () => ({
+      pending: translate("Pending"),
+      running: translate("Running"),
+      completed: translate("Completed"),
+      skipped: translate("Skipped"),
+    }),
+    [translate],
+  )
+
+  const pipelineStageSummaries = useMemo(
+    () => [
+      { stage: "01", name: translate("Ingestion"), desc: translate("Data and SLA ingestion") },
+      { stage: "02", name: translate("Quality"), desc: translate("Data quality checks") },
+      { stage: "03", name: translate("Schema"), desc: translate("Schema extraction") },
+      { stage: "04", name: translate("Profile"), desc: translate("Data profiling") },
+      { stage: "05", name: translate("Missing"), desc: translate("Imputation") },
+      { stage: "06", name: translate("Standardize"), desc: translate("Feature engineering") },
+      { stage: "07", name: translate("Readiness"), desc: translate("Readiness analysis") },
+      { stage: "08", name: translate("Insights"), desc: translate("Operational insights") },
+      { stage: "09", name: translate("Validation"), desc: translate("Business validation") },
+      { stage: "10", name: translate("BI delivery"), desc: translate("Semantic marts and dashboards") },
+    ],
+    [translate],
+  )
 
   const parsedPipelineError = pipelineError ? parsePipelineErrorMessage(pipelineError) : null
 
@@ -100,10 +122,11 @@ export default function PipelinePage() {
           if (status.status === "failed") {
             stopPolling()
             setIsRunning(false)
-            const message = status.error ?? `Pipeline ${targetRunId} failed.`
+            const message =
+              status.error ?? translate("Pipeline {runId} failed.", { runId: targetRunId })
             setPipelineError(message)
             toast({
-              title: "Pipeline Failed",
+              title: translate("Pipeline failed"),
               description: message,
               variant: "destructive",
             })
@@ -131,8 +154,8 @@ export default function PipelinePage() {
             }
             setIsRunning(false)
             toast({
-              title: "Pipeline Completed",
-              description: `Pipeline ${targetRunId} finished successfully.`,
+              title: translate("Pipeline completed"),
+              description: translate("Pipeline {runId} finished successfully.", { runId: targetRunId }),
             })
             return
           }
@@ -146,10 +169,12 @@ export default function PipelinePage() {
             return
           }
           setIsRunning(false)
-          setPipelineError("Pipeline is still running or failed. Please review artifacts for details.")
+          setPipelineError(translate("Pipeline is still running or failed. Please review artifacts for details."))
           toast({
-            title: "Pipeline status timed out",
-            description: `Unable to confirm completion for ${targetRunId}. Check the pipeline artifacts.`,
+            title: translate("Pipeline status timed out"),
+            description: translate("Unable to confirm completion for {runId}. Check the pipeline artifacts.", {
+              runId: targetRunId,
+            }),
             variant: "destructive",
           })
           return
@@ -160,7 +185,7 @@ export default function PipelinePage() {
 
       pollTimeoutRef.current = setTimeout(poll, 0)
     },
-    [stopPolling, toast],
+    [stopPolling, toast, translate],
   )
 
   useEffect(() => {
@@ -202,15 +227,19 @@ export default function PipelinePage() {
         const newPaths = uploads.map((upload) => upload.path)
         return [...existing, ...newPaths]
       })
+      const count = uploads.length
       toast({
-        title: "Data ready",
-        description: `Uploaded ${uploads.length} data file${uploads.length > 1 ? "s" : ""} for processing`,
+        title: translate("Data ready"),
+        description:
+          count === 1
+            ? translate("Uploaded 1 data file for processing.")
+            : translate("Uploaded {count} data files for processing.", { count }),
       })
     } catch (error) {
       console.error("[v0] Data file upload failed:", error)
       toast({
-        title: "Upload Failed",
-        description: error instanceof Error ? error.message : "Failed to upload data files",
+        title: translate("Upload failed"),
+        description: error instanceof Error ? error.message : translate("Failed to upload data files"),
         variant: "destructive",
       })
     } finally {
@@ -254,15 +283,19 @@ export default function PipelinePage() {
         const newPaths = uploads.map((upload) => upload.path)
         return [...existing, ...newPaths]
       })
+      const count = uploads.length
       toast({
-        title: "SLA files ready",
-        description: `Uploaded ${uploads.length} SLA document${uploads.length > 1 ? "s" : ""}`,
+        title: translate("SLA files ready"),
+        description:
+          count === 1
+            ? translate("Uploaded 1 SLA document.")
+            : translate("Uploaded {count} SLA documents.", { count }),
       })
     } catch (error) {
       console.error("[v0] SLA file upload failed:", error)
       toast({
-        title: "Upload Failed",
-        description: error instanceof Error ? error.message : "Failed to upload SLA files",
+        title: translate("Upload failed"),
+        description: error instanceof Error ? error.message : translate("Failed to upload SLA files"),
         variant: "destructive",
       })
     } finally {
@@ -294,8 +327,8 @@ export default function PipelinePage() {
     if (dataFiles.filter((f) => f.trim()).length === 0) {
       console.log("[v0] Validation failed - missing dataFiles")
       toast({
-        title: "Validation Error",
-        description: "Please upload or enter at least one data file path",
+        title: translate("Validation error"),
+        description: translate("Please upload or enter at least one data file path."),
         variant: "destructive",
       })
       return
@@ -325,8 +358,8 @@ export default function PipelinePage() {
       if (result === null) {
         acceptedAsync = true
         toast({
-          title: "Pipeline Accepted",
-          description: `Pipeline ${trimmedRunId} is running in the background.`,
+          title: translate("Pipeline accepted"),
+          description: translate("Pipeline {runId} is running in the background.", { runId: trimmedRunId }),
         })
         try {
           const statusSnapshot = await api.getPipelineStatus(trimmedRunId)
@@ -346,19 +379,19 @@ export default function PipelinePage() {
           console.debug("[v0] Unable to read pipeline status after completion:", statusError)
         }
         toast({
-          title: "Pipeline Completed",
-          description: `Pipeline ${result.run_id} finished successfully.`,
+          title: translate("Pipeline completed"),
+          description: translate("Pipeline {runId} finished successfully.", { runId: result.run_id }),
         })
       }
     } catch (error) {
       console.error("[v0] Pipeline execution failed:", error)
       stopPolling()
       setPipelineResult(null)
-      setPipelineError(error instanceof Error ? error.message : "Unknown error occurred")
+      setPipelineError(error instanceof Error ? error.message : translate("Unknown error occurred"))
       setPipelineProgress(null)
       toast({
-        title: "Pipeline Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
+        title: translate("Pipeline failed"),
+        description: error instanceof Error ? error.message : translate("Unknown error occurred"),
         variant: "destructive",
       })
     } finally {
@@ -394,39 +427,60 @@ export default function PipelinePage() {
             />
 
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Full Pipeline Execution</h1>
-              <p className="text-muted-foreground">Configure and run the complete Mind-Q pipeline</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-foreground">{translate("Full pipeline execution")}</h1>
+                <HelpTrigger
+                  topicId="pipeline.overview"
+                  aria-label={translate("Explain the pipeline workflow")}
+                  buildTopic={() => ({
+                    title: translate("Full pipeline automation overview"),
+                    summary: translate(
+                      "Runs the Mind-Q orchestration covering ingestion, data quality, schema checks, and BI delivery.",
+                    ),
+                    detailItems: [
+                      translate("Includes data ingestion, SLA validation, enrichment, and semantic model export."),
+                      translate("Supports optional SLA documents and AI-generated executive summaries."),
+                      translate("Each phase reports artifacts that feed the results and BI workspaces."),
+                    ],
+                    suggestedQuestions: [
+                      translate("Which phases are executed when I enable stop-on-error?"),
+                      translate("How can I inspect artifacts after the run finishes?"),
+                    ],
+                  })}
+                />
+              </div>
+              <p className="text-muted-foreground">{translate("Configure and run the complete Mind-Q pipeline.")}</p>
             </div>
 
             {pipelineProgress && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Pipeline Progress</CardTitle>
+                  <CardTitle>{translate("Pipeline progress")}</CardTitle>
                   <CardDescription>
                     {pipelineProgress.status === "completed"
-                      ? `Run ${runId} completed successfully.`
+                      ? translate("Run {runId} completed successfully.", { runId })
                       : pipelineProgress.status === "failed"
-                        ? `Run ${runId} encountered an error.`
-                        : `Tracking run ${runId}.`}
+                        ? translate("Run {runId} encountered an error.", { runId })
+                        : translate("Tracking run {runId}.", { runId })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-medium">
                       {pipelineProgress.status === "completed"
-                        ? "Completed"
+                        ? translate("Completed")
                         : pipelineProgress.status === "failed"
-                          ? "Failed"
+                          ? translate("Failed")
                           : currentPhaseLabel
-                              ? `Running: ${currentPhaseLabel}`
-                              : "Running"}
+                              ? translate("Running: {label}", { label: currentPhaseLabel })
+                              : translate("Running")}
                     </div>
                     <div className="text-sm text-muted-foreground">{progressPercent}%</div>
                   </div>
-                  <Progress value={progressPercent} aria-label="Pipeline progress" />
+                  <Progress value={progressPercent} aria-label={translate("Pipeline progress")} />
                   <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                     {pipelineProgress.phases.map((phase) => {
-                      const statusLabel = PHASE_STATUS_LABELS[phase.status]
+                      const statusLabel = phaseStatusLabels[phase.status]
                       const statusClasses =
                         phase.status === "completed"
                           ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-600"
@@ -462,59 +516,61 @@ export default function PipelinePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Pipeline Configuration</CardTitle>
-                <CardDescription>Set up your pipeline run parameters</CardDescription>
+                <CardTitle>{translate("Pipeline configuration")}</CardTitle>
+                <CardDescription>{translate("Set up your pipeline run parameters.")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Run ID */}
                 <div className="space-y-2">
-                    <Label htmlFor="runId">Run ID</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="runId"
-                        placeholder="Run identifier"
-                        value={runId}
-                        onChange={(e) => setRunId(e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          const newId = generateRunId()
-                          setRunId(newId)
-                          toast({
-                            title: "Run ID updated",
-                            description: `Generated ${newId}`,
-                          })
-                        }}
-                      >
-                        Regenerate
-                      </Button>
-                    </div>
-                  <p className="text-xs text-muted-foreground">Unique identifier for this pipeline run</p>
+                  <Label htmlFor="runId">{translate("Run ID")}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="runId"
+                      placeholder={translate("Run identifier")}
+                      value={runId}
+                      onChange={(e) => setRunId(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const newId = generateRunId()
+                        setRunId(newId)
+                        toast({
+                          title: translate("Run ID updated"),
+                          description: translate("Generated {runId}", { runId: newId }),
+                        })
+                      }}
+                    >
+                      {translate("Regenerate")}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {translate("Unique identifier for this pipeline run.")}
+                  </p>
                 </div>
 
                 {/* Data Files */}
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="space-y-0.5">
-                      <Label>Data Files</Label>
+                      <Label>{translate("Data files")}</Label>
                       <p className="text-xs text-muted-foreground">
-                        Upload raw datasets or enter server-accessible paths.
+                        {translate("Upload raw datasets or enter server-accessible paths.")}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={addDataFile} disabled={isUploadingDataFiles}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Upload Files
+                        {translate("Upload files")}
                       </Button>
                       <Button variant="ghost" size="sm" onClick={addManualDataFile}>
-                        Add Path
+                        {translate("Add path")}
                       </Button>
                     </div>
                   </div>
                   {isUploadingDataFiles ? (
-                    <p className="text-xs text-muted-foreground">Uploading data files...</p>
+                    <p className="text-xs text-muted-foreground">{translate("Uploading data files...")}</p>
                   ) : null}
                   {dataFiles.length > 0 ? (
                     <div className="space-y-2">
@@ -532,11 +588,14 @@ export default function PipelinePage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs italic text-muted-foreground">No data files selected yet.</p>
+                    <p className="text-xs italic text-muted-foreground">{translate("No data files selected yet.")}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Uploaded files are stored under <code>uploads/</code> and their absolute paths are sent to the
-                    pipeline. Adjust paths if the backend expects a different location.
+                    {translate("Uploaded files are stored under")}
+                    <code className="mx-1">uploads/</code>
+                    {translate(
+                      "and their absolute paths are sent to the pipeline. Adjust paths if the backend expects a different location.",
+                    )}
                   </p>
                 </div>
 
@@ -544,21 +603,23 @@ export default function PipelinePage() {
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="space-y-0.5">
-                      <Label>SLA Files (Optional)</Label>
-                      <p className="text-xs text-muted-foreground">Attach SLA documents or reference existing paths.</p>
+                      <Label>{translate("SLA files (optional)")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {translate("Attach SLA documents or reference existing paths.")}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={addSlaFile} disabled={isUploadingSlaFiles}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Upload SLA
+                        {translate("Upload SLA")}
                       </Button>
                       <Button variant="ghost" size="sm" onClick={addManualSlaFile}>
-                        Add Path
+                        {translate("Add path")}
                       </Button>
                     </div>
                   </div>
                   {isUploadingSlaFiles ? (
-                    <p className="text-xs text-muted-foreground">Uploading SLA documents...</p>
+                    <p className="text-xs text-muted-foreground">{translate("Uploading SLA documents...")}</p>
                   ) : null}
                   {slaFiles.length > 0 ? (
                     <div className="space-y-2">
@@ -576,10 +637,12 @@ export default function PipelinePage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs italic text-muted-foreground">No SLA documents attached.</p>
+                    <p className="text-xs italic text-muted-foreground">{translate("No SLA documents attached.")}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Supported formats: PDF, DOCX, CSV, HTML, Excel. Uploaded files are stored under <code>uploads/</code>.
+                    {translate("Supported formats: PDF, DOCX, CSV, HTML, Excel. Uploaded files are stored under")}
+                    <code className="mx-1">uploads/</code>
+                    {translate("for SLA processing.")}
                   </p>
                 </div>
 
@@ -587,16 +650,20 @@ export default function PipelinePage() {
                 <div className="space-y-4 rounded-lg border border-border bg-card/50 p-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="stopOnError">Stop on Error</Label>
-                      <p className="text-xs text-muted-foreground">Abort pipeline on first phase failure</p>
+                      <Label htmlFor="stopOnError">{translate("Stop on error")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {translate("Abort pipeline on first phase failure.")}
+                      </p>
                     </div>
                     <Switch id="stopOnError" checked={stopOnError} onCheckedChange={setStopOnError} />
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="llmSummary">LLM Summary</Label>
-                      <p className="text-xs text-muted-foreground">Generate AI-powered executive summary</p>
+                      <Label htmlFor="llmSummary">{translate("LLM summary")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {translate("Generate AI-powered executive summary.")}
+                      </p>
                     </div>
                     <Switch id="llmSummary" checked={llmSummary} onCheckedChange={setLlmSummary} />
                   </div>
@@ -611,10 +678,10 @@ export default function PipelinePage() {
                 >
                   <Play className="mr-2 h-5 w-5" />
                   {isUploadingDataFiles || isUploadingSlaFiles
-                    ? "Uploading files..."
+                    ? translate("Uploading files...")
                     : isRunning
-                      ? "Running Pipeline..."
-                      : "Run Full Pipeline"}
+                      ? translate("Running pipeline...")
+                      : translate("Run full pipeline")}
                 </Button>
               </CardContent>
             </Card>
@@ -622,9 +689,11 @@ export default function PipelinePage() {
             {(pipelineResult || pipelineError) && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Last Pipeline Response</CardTitle>
+                  <CardTitle>{translate("Last pipeline response")}</CardTitle>
                   <CardDescription>
-                    {!pipelineResult && pipelineError ? "Pipeline request failed" : "Latest response payload"}
+                    {!pipelineResult && pipelineError
+                      ? translate("Pipeline request failed.")
+                      : translate("Latest response payload")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -633,7 +702,7 @@ export default function PipelinePage() {
                       <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
                       <div className="space-y-1">
                         <p className="font-medium text-destructive">
-                          {parsedPipelineError?.headline || "Pipeline call failed"}
+                          {parsedPipelineError?.headline || translate("Pipeline call failed")}
                         </p>
                         {parsedPipelineError?.reason ? (
                           <p className="text-sm text-destructive/80">{parsedPipelineError.reason}</p>
@@ -642,7 +711,7 @@ export default function PipelinePage() {
                         )}
                         {parsedPipelineError?.references?.length ? (
                           <div className="pt-1">
-                            <p className="text-xs font-medium text-destructive/60">Related files</p>
+                            <p className="text-xs font-medium text-destructive/60">{translate("Related files")}</p>
                             <ul className="mt-1 space-y-1 text-xs text-destructive/60">
                               {parsedPipelineError.references.map((reference) => (
                                 <li key={reference}>
@@ -658,11 +727,11 @@ export default function PipelinePage() {
                   {pipelineResult ? (
                     <div className="space-y-3">
                       <div className="rounded-md border border-border bg-muted/20 p-4">
-                        <p className="text-sm font-medium text-muted-foreground">Run ID</p>
+                        <p className="text-sm font-medium text-muted-foreground">{translate("Run ID")}</p>
                         <p className="font-mono text-sm text-foreground">{pipelineResult.run_id}</p>
                       </div>
                       <div className="rounded-md border border-border bg-muted/20 p-4">
-                        <p className="text-sm font-medium text-muted-foreground">Phases Payload</p>
+                        <p className="text-sm font-medium text-muted-foreground">{translate("Phases payload")}</p>
                         <pre className="max-h-64 overflow-auto text-xs text-foreground">
                           {JSON.stringify(pipelineResult.phases, null, 2)}
                         </pre>
@@ -676,23 +745,12 @@ export default function PipelinePage() {
             {/* Pipeline Stages Overview */}
             <Card>
               <CardHeader>
-                <CardTitle>Pipeline Stages</CardTitle>
-                <CardDescription>10 stages from ingestion to BI delivery</CardDescription>
+                <CardTitle>{translate("Pipeline stages")}</CardTitle>
+                <CardDescription>{translate("10 stages from ingestion to BI delivery")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 md:grid-cols-3">
-                  {[
-                    { stage: "01", name: "Ingestion", desc: "Data & SLA ingestion" },
-                    { stage: "02", name: "Quality", desc: "Data quality checks" },
-                    { stage: "03", name: "Schema", desc: "Schema extraction" },
-                    { stage: "04", name: "Profile", desc: "Data profiling" },
-                    { stage: "05", name: "Missing", desc: "Imputation" },
-                    { stage: "06", name: "Standardize", desc: "Feature engineering" },
-                    { stage: "07", name: "Readiness", desc: "Readiness analysis" },
-                    { stage: "08", name: "Insights", desc: "Operational insights" },
-                    { stage: "09", name: "Validation", desc: "Business validation" },
-                    { stage: "10", name: "BI Delivery", desc: "Semantic marts & dashboards" },
-                  ].map((phase) => (
+                  {pipelineStageSummaries.map((phase) => (
                     <div
                       key={phase.stage}
                       className="rounded-lg border border-border bg-gradient-to-br from-card to-primary/5 p-4"

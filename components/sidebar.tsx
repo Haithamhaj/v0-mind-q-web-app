@@ -4,19 +4,21 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Play, FileText, CheckCircle2, Activity, Settings, Database, Brain } from "lucide-react"
+import { useLanguage } from "@/context/language-context"
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Pipeline", href: "/pipeline", icon: Play },
-  { name: "Phases", href: "/phases", icon: Activity },
-  { name: "Results", href: "/results", icon: FileText },
-  { name: "BI", href: "/bi", icon: Brain },
-  { name: "SLA Compliance", href: "/sla", icon: CheckCircle2 },
-  { name: "Data Sources", href: "/sources", icon: Database },
-  { name: "Settings", href: "/settings", icon: Settings },
-]
+  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Pipeline", href: "/pipeline", icon: Play },
+  { label: "Phases", href: "/phases", icon: Activity },
+  { label: "Results", href: "/results", icon: FileText },
+  { label: "BI", href: "/bi", icon: Brain },
+  { label: "SLA Compliance", href: "/sla", icon: CheckCircle2 },
+  { label: "Data Sources", href: "/sources", icon: Database },
+  { label: "Settings", href: "/settings", icon: Settings },
+] as const
 
 export function Sidebar() {
+  const { translate } = useLanguage()
   const pathname = usePathname()
 
   return (
@@ -34,7 +36,7 @@ export function Sidebar() {
           const isActive = pathname === item.href
           return (
             <Link
-              key={item.name}
+              key={item.href}
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -44,7 +46,7 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-5 w-5" />
-              {item.name}
+              {translate(item.label)}
             </Link>
           )
         })}
@@ -53,8 +55,8 @@ export function Sidebar() {
       {/* Footer */}
       <div className="border-t border-border p-4">
         <div className="text-xs text-muted-foreground">
-          <p className="font-semibold">Mind-Q V4</p>
-          <p>Logistics Intelligence Platform</p>
+          <p className="font-semibold">{translate("Mind-Q V4")}</p>
+          <p>{translate("Logistics Intelligence Platform")}</p>
         </div>
       </div>
     </div>
