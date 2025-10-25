@@ -39,6 +39,10 @@ export const NarrativeFeed: React.FC<NarrativeFeedProps> = ({ onOpen }) => {
           severity={(insight.severity as "low" | "medium" | "high") ?? "medium"}
           drivers={insight.drivers}
           source={insight.source}
+          recommendations={insight.recommendations}
+          nextSteps={insight.next_steps}
+          metricsContext={insight.metrics_context}
+          tags={insight.tags}
           onOpen={() => onOpen?.(insight)}
         />
       ))}

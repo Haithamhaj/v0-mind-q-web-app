@@ -43,6 +43,19 @@ export type Insight = {
   timestamp?: string | null;
   drivers?: InsightDriver[];
   source?: string;
+  recommendations?: string[];
+  next_steps?: string[];
+  metrics_context?: Record<string, unknown>;
+  tags?: string[];
+  deltas?: Record<string, number>;
+  delta_descriptions?: Record<
+    string,
+    {
+      value?: number | null;
+      formatted?: string | null;
+      movement?: string | null;
+    }
+  >;
 };
 
 export type BiDatasetRow = Record<string, unknown>;
@@ -86,6 +99,17 @@ export type CorrelationCollection = {
   };
 };
 
+export type InsightStats = {
+  insights_total?: number;
+  by_type?: Record<string, number>;
+};
+
+export type CatalogMetadata = {
+  metrics?: Record<string, unknown>;
+  dimensions?: Record<string, unknown>;
+  insights?: Record<string, unknown>;
+};
+
 export type BiDataContextValue = {
   metrics: MetricSpec[];
   dimensions: DimensionsCatalog;
@@ -96,5 +120,7 @@ export type BiDataContextValue = {
   error?: string;
   filters: Record<string, string[]>;
   setFilter: (dimension: string, values: string[]) => void;
+  insightStats?: InsightStats;
+  catalogMeta: CatalogMetadata;
 };
 

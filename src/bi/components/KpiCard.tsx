@@ -18,20 +18,15 @@ const formatNumber = (input: number | string): string => {
   if (typeof input !== "number" || !Number.isFinite(input)) {
     return typeof input === "string" ? input : String(input ?? "");
   }
-
-  const isInteger = Number.isInteger(input);
-  const value = isInteger ? input : Number(input.toFixed(2));
-  const [integerPart, fractionalPart] = value.toString().split(".");
-  const sign = integerPart.startsWith("-") ? "-" : "";
-  const digits = sign ? integerPart.slice(1) : integerPart;
-  const groupedInteger = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-  if (isInteger) {
-    return `${sign}${groupedInteger}`;
+  const hasFraction = Math.abs(input % 1) > Number.EPSILON;
+  try {
+    return new Intl.NumberFormat("ar-SA", {
+      maximumFractionDigits: hasFraction ? 2 : 0,
+      minimumFractionDigits: hasFraction ? 2 : 0,
+    }).format(input);
+  } catch {
+    return hasFraction ? input.toFixed(2) : input.toFixed(0);
   }
-
-  const paddedFraction = (fractionalPart ?? "").padEnd(2, "0").slice(0, 2);
-  return `${sign}${groupedInteger}.${paddedFraction}`;
 };
 
 const Sparkline = ({ points }: { points: number[] }) => {
@@ -50,7 +45,7 @@ const Sparkline = ({ points }: { points: number[] }) => {
   }, [points]);
 
   return (
-    <svg viewBox="0 0 100 100" className="h-12 w-full text-primary/70" role="img" aria-label="Trend sparkline">
+    <svg viewBox="0 0 100 100" className="h-12 w-full text-primary/70" role="img" aria-label="منحنى الاتجاه">
       <polyline
         fill="none"
         stroke="currentColor"
@@ -68,7 +63,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   title,
   value,
   delta,
-  deltaLabel = "WoW",
+  deltaLabel = "التغير الأسبوعي",
   trendSpark,
   onClick,
   active = false,
@@ -83,12 +78,10 @@ export const KpiCard: React.FC<KpiCardProps> = ({
         : "text-muted-foreground"
       : "text-muted-foreground";
 
-  let formattedDelta: string;
+  let formattedDelta = "غير متاح";
   if (typeof delta === "number" && Number.isFinite(delta)) {
-    const symbol = delta > 0 ? "UP" : delta < 0 ? "DOWN" : "FLAT";
-    formattedDelta = `${symbol} ${Math.abs(delta).toFixed(2)}%`;
-  } else {
-    formattedDelta = "N/A";
+    const direction = delta > 0 ? "ارتفاع" : delta < 0 ? "انخفاض" : "استقرار";
+    formattedDelta = `${direction} ${Math.abs(delta).toFixed(2)}%`;
   }
 
   return (
@@ -109,7 +102,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           <span className="text-2xl font-semibold tracking-tight">{formatNumber(value)}</span>
         </div>
         <span className={clsx("rounded-full px-2 py-1 text-xs font-medium", signClass)}>
-          {deltaLabel} {formattedDelta}
+          {deltaLabel}: {formattedDelta}
         </span>
       </div>
       <div className="flex items-center gap-3">
@@ -117,7 +110,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           <Sparkline points={trendSpark} />
         ) : (
           <div className="flex h-12 w-full items-center justify-center rounded-xl bg-muted/60 text-xs font-medium text-muted-foreground">
-            N/A
+            لا توجد بيانات
           </div>
         )}
       </div>

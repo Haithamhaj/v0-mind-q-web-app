@@ -48,19 +48,34 @@ export const mockInsights: Insight[] = [
       { dimension: "entity_id", value: "ORD-1032", impact: 0.21 },
     ],
     source: "stage_08/anomalies",
+    recommendations: [
+      "نسّق مع مركز جدة لاستيعاب الطلبات الإضافية دون التأثير على جودة الخدمة.",
+      "راجع خطة تحصيل الدفع عند الاستلام لضمان توافر السيولة."
+    ],
+    next_steps: ["تأكيد النتائج مع فريق المرحلة 09 وتحديث خطة العمليات اليومية."],
+    metrics_context: { movement: "ارتفاع", delta_text: "+22.0%" },
+    tags: ["شذوذ", "COD"],
   },
   {
     id: "trend-1",
     type: "trend",
     kpi: "cod_conversion",
     title: "تحسن في معدل الدفع عند الاستلام",
-    summary: "WoW Δ: +5.0%; YoY Δ: +9.0%",
+    summary: "التغير الأسبوعي: +5.0%؛ التغير السنوي: +9.0%",
     severity: "medium",
     drivers: [
       { dimension: "destination", value: "RUH", impact: 0.55 },
       { dimension: "destination", value: "JED", impact: 0.45 },
     ],
     source: "fallback/phase10",
+    recommendations: [
+      "تابع استمرار التحسن في الرياض وجدة خلال الأسبوع القادم.",
+      "حدّث توقعات التحصيل النقدي بناءً على الاتجاه الحالي."
+    ],
+    next_steps: ["أدرج المؤشر في تقرير المتابعة اليومية وشارك النتائج مع فريق المبيعات."],
+    metrics_context: { movement: "ارتفاع", delta_text: "+5.0%" },
+    deltas: { wow: 0.05, yoy: 0.09 },
+    tags: ["اتجاه", "COD"],
   },
 ];
 

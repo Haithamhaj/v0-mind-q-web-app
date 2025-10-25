@@ -390,9 +390,9 @@ type RawMetricsSummary = {
   correlations?: CorrelationCollection;
 };
 
-const integerFormatter = new Intl.NumberFormat('en-US');
-const decimalFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const percentFormatter = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const integerFormatter = new Intl.NumberFormat('ar-SA');
+const decimalFormatter = new Intl.NumberFormat('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const percentFormatter = new Intl.NumberFormat('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type RawChatMessage = {
   role: 'user' | 'assistant';
@@ -526,7 +526,7 @@ const buildTabs = (metrics: MetricSpec[], categorical: string[]): TabConfig[] =>
 
   const timeMetric = metrics.find((metric) => metric.time_col);
   if (timeMetric) {
-    tabs.push({ id: 'time', label: 'Time', metricId: timeMetric.id, chartType: 'line' });
+    tabs.push({ id: 'time', label: 'الزمن', metricId: timeMetric.id, chartType: 'line' });
   }
 
   uniqueDims.slice(0, 4).forEach((dimension, index) => {
@@ -544,7 +544,7 @@ const buildTabs = (metrics: MetricSpec[], categorical: string[]): TabConfig[] =>
     tabs.push({ id: 'metric-default', label: metrics[0].title ?? metrics[0].id, metricId: metrics[0].id, chartType: 'area' });
   }
 
-  tabs.push({ id: 'narrative', label: 'Narrative' });
+  tabs.push({ id: 'narrative', label: 'السرد' });
   return tabs;
 };
 
@@ -566,7 +566,7 @@ const formatPercent = (value?: number | null) => {
 
 const formatCurrency = (value?: number | null) => {
   const formatted = formatDecimal(value);
-  return formatted === '-' ? '—' : `${formatted} SAR`;
+  return formatted === '-' ? '—' : `${formatted} ر.س`;
 };
 
 const StoryBIContent: React.FC = () => {
@@ -575,8 +575,21 @@ const StoryBIContent: React.FC = () => {
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
   const { setFilter } = useBiData();
-  const { insights } = useBiInsights();
+  const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
+
+  const insightTypeLabel = (type: string) => {
+    switch (type) {
+      case 'anomaly':
+        return translate('شذوذ');
+      case 'trend':
+        return translate('اتجاه');
+      default:
+        return translate(type);
+    }
+  };
+
+  const formatStatCount = (value?: number) => (typeof value === 'number' ? integerFormatter.format(value) : '0');
 
   const categoricalNames = useMemo(
     () => dimensions.categorical.map((item) => item.name).filter(Boolean),
@@ -591,9 +604,9 @@ const StoryBIContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? 'narrative');
   const [selectedKpi, setSelectedKpi] = useState<string | null>(tabs[0]?.metricId ?? metrics[0]?.id ?? null);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [canvasNarrative, setCanvasNarrative] = useState('Select a KPI or ask a question to start the story.');
+  const [canvasNarrative, setCanvasNarrative] = useState('اختر مؤشراً أو اطرح سؤالاً لبدء السرد.');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Hi! Choose a KPI card, open an insight, or ask for a breakdown.' },
+    { role: 'assistant', content: 'مرحباً! اختر بطاقة مؤشر، افتح إحدى الرؤى، أو اطلب تفصيلاً معيناً.' },
   ]);
   const [chatInput, setChatInput] = useState('');
   const [firstChartLogged, setFirstChartLogged] = useState(false);
@@ -606,12 +619,12 @@ const StoryBIContent: React.FC = () => {
   const [rawLlmInput, setRawLlmInput] = useState('');
   const [rawLlmLoading, setRawLlmLoading] = useState(false);
   const [rawLlmError, setRawLlmError] = useState<string | null>(null);
-  const breakdowns = rawMetrics?.breakdowns ?? [];
+  const breakdowns = useMemo(() => rawMetrics?.breakdowns ?? [], [rawMetrics]);
 
   const biSummary = rawMetrics
     ? (() => {
         const summary: string[] = [];
-        const ordersText = rawMetrics.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("Awaiting data");
+        const ordersText = rawMetrics.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("بانتظار البيانات");
         summary.push(
           translate("Orders processed: {value}", {
             value: ordersText,
@@ -620,14 +633,14 @@ const StoryBIContent: React.FC = () => {
 
         const codShare = rawMetrics.totals?.orders_cod_share_pct != null
           ? formatPercent(rawMetrics.totals.orders_cod_share_pct)
-          : translate("Awaiting data");
+          : translate("بانتظار البيانات");
         summary.push(
           translate("Cash-on-delivery share: {value}", {
             value: codShare,
           }),
         );
 
-        const codCollected = rawMetrics.totals?.cod_total != null ? formatCurrency(rawMetrics.totals.cod_total) : translate("Awaiting data");
+        const codCollected = rawMetrics.totals?.cod_total != null ? formatCurrency(rawMetrics.totals.cod_total) : translate("بانتظار البيانات");
         summary.push(
           translate("Total COD collected: {value}", {
             value: codCollected,
@@ -635,7 +648,7 @@ const StoryBIContent: React.FC = () => {
         );
 
         if (rawMetrics.order_date_range) {
-          const coverageRange = `${rawMetrics.order_date_range.min ?? translate("Awaiting data")} → ${rawMetrics.order_date_range.max ?? translate("Awaiting data")}`;
+          const coverageRange = `${rawMetrics.order_date_range.min ?? translate("بانتظار البيانات")} → ${rawMetrics.order_date_range.max ?? translate("بانتظار البيانات")}`;
           summary.push(
             translate("Data coverage: {range}", {
               range: coverageRange,
@@ -648,7 +661,7 @@ const StoryBIContent: React.FC = () => {
           const topValue = topBreakdown?.values?.[0];
           const label = topBreakdown?.label ?? translate("Not specified");
           const recordedOrders = toNumber(topValue?.orders);
-          const formattedOrders = recordedOrders != null ? formatInteger(recordedOrders) : translate("Awaiting data");
+          const formattedOrders = recordedOrders != null ? formatInteger(recordedOrders) : translate("بانتظار البيانات");
           summary.push(
             translate("Top breakdown {label} contributes {value} orders.", {
               label,
@@ -820,7 +833,7 @@ const StoryBIContent: React.FC = () => {
   const handleCardSelect = (metricIdValue: string) => {
     setSelectedKpi(metricIdValue);
     setSidePanelOpen(true);
-    setCanvasNarrative(`Inspecting ${metricIdValue} in detail.`);
+    setCanvasNarrative(`يتم التركيز على ${metricIdValue} بالتفصيل.`);
     if (typeof performance !== 'undefined') {
       console.info('[story-bi] sidepanel open (ms):', performance.now().toFixed(2), '| metric:', metricIdValue);
     }
@@ -832,11 +845,11 @@ const StoryBIContent: React.FC = () => {
       setSelectedKpi(tab.metricId);
     }
     if (tab.dimension) {
-      setCanvasNarrative(`Highlighting ${tab.metricId ?? metricId ?? ''} by ${tab.dimension}.`);
+      setCanvasNarrative(`عرض ${tab.metricId ?? metricId ?? ''} بحسب ${tab.dimension}.`);
     } else if (tab.id === 'narrative') {
-      setCanvasNarrative('Narrative feed applies curated insights from Phase 08-10 outputs.');
+      setCanvasNarrative('تُعرض هنا الرؤى المُجهزة من مخرجات المراحل 08 إلى 10.');
     } else {
-      setCanvasNarrative(`Showing ${tab.metricId ?? metricId ?? ''}.`);
+      setCanvasNarrative(`إظهار ${tab.metricId ?? metricId ?? ''} حالياً.`);
     }
   };
 
@@ -847,9 +860,9 @@ const StoryBIContent: React.FC = () => {
           setFilter(driver.dimension, [String(driver.value)]);
         }
       });
-      setCanvasNarrative(`Filters applied from insight "${insight.title}".`);
+      setCanvasNarrative(`تم تطبيق مرشحات من الرؤية "${insight.title}".`);
     } else {
-      setCanvasNarrative(`Insight "${insight.title}" opened.`);
+      setCanvasNarrative(`تم فتح الرؤية "${insight.title}".`);
     }
     if (insight.kpi) {
       setSelectedKpi(insight.kpi);
@@ -877,27 +890,27 @@ const StoryBIContent: React.FC = () => {
 
     if (matchingMetric) {
       setSelectedKpi(matchingMetric.id);
-      assistantMessage = `Focused on metric ${matchingMetric.title ?? matchingMetric.id}.`;
+      assistantMessage = `تم التركيز على المؤشر ${matchingMetric.title ?? matchingMetric.id}.`;
     }
 
     if (matchingDimension) {
       setActiveTab(tabs.find((tab) => tab.dimension === matchingDimension)?.id ?? activeTab);
-      assistantMessage = `Exploring ${matchingMetric?.title ?? matchingMetric?.id ?? metricId ?? 'metric'} by ${matchingDimension}.`;
-    } else if (matchingMetric && !assistantMessage.includes('Exploring')) {
-      assistantMessage = `Exploring ${matchingMetric.title ?? matchingMetric.id}. Try mentioning a dimension for a breakdown.`;
+      assistantMessage = `يتم تحليل ${matchingMetric?.title ?? matchingMetric?.id ?? metricId ?? 'المؤشر'} بحسب ${matchingDimension}.`;
+    } else if (matchingMetric && !assistantMessage.includes('يتم تحليل')) {
+      assistantMessage = `يتم تحليل ${matchingMetric.title ?? matchingMetric.id}. جرّب ذكر بُعد للحصول على تفصيل أدق.`;
     }
 
     if (!matchingMetric && !matchingDimension) {
-      const metricHints = metrics.map((item) => item.id).slice(0, 5).join(', ') || 'none detected';
-      const dimensionHints = categoricalNames.slice(0, 5).join(', ') || 'no categorical columns detected';
-      assistantMessage = `Metric or dimension not available. Try these metrics: ${metricHints}. Dimensions: ${dimensionHints}.`;
+      const metricHints = metrics.map((item) => item.id).slice(0, 5).join('، ') || 'لا يوجد';
+      const dimensionHints = categoricalNames.slice(0, 5).join('، ') || 'لا توجد أبعاد متاحة';
+      assistantMessage = `تعذر العثور على المؤشر أو البُعد المطلوب. جرّب هذه المؤشرات: ${metricHints}. الأبعاد المقترحة: ${dimensionHints}.`;
     }
 
-    setCanvasNarrative(assistantMessage || 'Canvas updated.');
+    setCanvasNarrative(assistantMessage || 'تم تحديث اللوحة.');
     setChatHistory((prev) => [
       ...prev,
       { role: 'user', content: query },
-      { role: 'assistant', content: assistantMessage || 'Canvas updated.' },
+      { role: 'assistant', content: assistantMessage || 'تم تحديث اللوحة.' },
     ]);
     setChatInput('');
   };
@@ -984,44 +997,44 @@ const StoryBIContent: React.FC = () => {
     <div className="flex flex-col gap-6 pb-32" dir="rtl">
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-start">{translate("Story-driven BI")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-start">{translate("لوحة التحليلات السردية")}</h1>
           <HelpTrigger
             topicId="bi.overview"
-            aria-label={translate("Explain the BI workspace")}
+            aria-label={translate("شرح مساحة العمل للذكاء البياني")}
             variant="link"
             buildTopic={() => {
-              const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("Awaiting data")
-              const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("Awaiting data")
+              const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("بانتظار البيانات")
+              const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("بانتظار البيانات")
               const coverage = rawMetrics?.order_date_range
-                ? `${rawMetrics.order_date_range.min ?? translate("Awaiting data")} → ${rawMetrics.order_date_range.max ?? translate("Awaiting data")}`
-                : translate("Awaiting data")
+                ? `${rawMetrics.order_date_range.min ?? translate("بانتظار البيانات")} → ${rawMetrics.order_date_range.max ?? translate("بانتظار البيانات")}`
+                : translate("بانتظار البيانات")
               return {
-                title: translate("Story-driven BI workspace"),
+                title: translate("مساحة العمل السردية"),
                 summary: translate(
-                  "This page blends curated KPIs, correlations, and AI narratives derived from phases 08-10.",
+                  "تجمع هذه الصفحة مؤشرات الأداء، والرؤى، والارتباطات الناتجة عن المراحل 08 إلى 10 في قصة تشغيلية واحدة.",
                 ),
                 detailItems: [
-                  translate("Processed orders: {value}", { value: orders }),
-                  translate("COD share recorded at {value}", { value: codShare }),
-                  translate("Data coverage: {range}", { range: coverage }),
+                  translate("الطلبات المعالجة: {value}", { value: orders }),
+                  translate("حصة الدفع عند الاستلام: {value}", { value: codShare }),
+                  translate("نطاق البيانات الزمنية: {range}", { range: coverage }),
                 ],
                 sources: [
                   {
-                    label: translate("Phase 08 insights"),
-                    description: translate("Profiling and exploratory analysis feeding this BI story."),
+                    label: translate("مخرجات المرحلة 08"),
+                    description: translate("تحليل البيانات الاستكشافي الذي يكشف عن المحركات والع anomalies."),
                   },
                   {
-                    label: translate("Phase 09 validation"),
-                    description: translate("SLA and business validation gates referenced in the KPIs."),
+                    label: translate("بوابة المرحلة 09"),
+                    description: translate("نتائج التحقق التشغيلي وقياس الالتزام بمؤشرات SLA."),
                   },
                   {
-                    label: translate("Phase 10 semantic marts"),
-                    description: translate("Published metrics powering the charts and narratives."),
+                    label: translate("مخازن المرحلة 10"),
+                    description: translate("المقاييس المعتمدة التي تغذي اللوحات والرسوم البيانية."),
                   },
                 ],
                 suggestedQuestions: [
-                  translate("Which dimension is driving the latest KPI swings?"),
-                  translate("What anomalies should I discuss with operations?"),
+                  translate("ما هو البُعد الذي يفسر تغير المؤشر الأخير؟"),
+                  translate("أي الشذوذات يجب مناقشتها مع فريق العمليات؟"),
                 ],
                 onAsk: () => {
                   setActiveTab('narrative')
@@ -1030,12 +1043,22 @@ const StoryBIContent: React.FC = () => {
               }
             }}
           >
-            {translate("Explain")}
+            {translate("شرح")}
           </HelpTrigger>
         </div>
         <p className="text-sm text-muted-foreground text-start">
-          {translate("Built from Phase 08 insights, Phase 09 validation, and Phase 10 marts. Columns are discovered at runtime; no hardcoded schema.")}
+          {translate("تعتمد اللوحة على رؤى المرحلة 08، والتحقق التشغيلي في المرحلة 09، وقواعد البيانات الدلالية في المرحلة 10. يتم اكتشاف الأعمدة تلقائياً دون مخطط ثابت.")}
         </p>
+        {insightStats && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>إجمالي الرؤى: {formatStatCount(insightStats.insights_total)}</span>
+            {Object.entries(insightStats.by_type ?? {}).map(([type, count]) => (
+              <span key={type} className="rounded-full bg-muted px-2 py-0.5">
+                {insightTypeLabel(type)}: {formatStatCount(typeof count === 'number' ? count : Number(count ?? 0))}
+              </span>
+            ))}
+          </div>
+        )}
       </header>
 
       {biSummary?.length ? (
@@ -1391,7 +1414,7 @@ const StoryBIContent: React.FC = () => {
               title={summary.metric.title ?? summary.metric.id}
               value={summary.value}
               delta={wowDelta}
-              deltaLabel="WoW"
+              deltaLabel="التغير الأسبوعي"
               trendSpark={hasTime ? summary.spark : undefined}
               onClick={() => handleCardSelect(summary.metric.id)}
               active={selectedKpi === summary.metric.id}
@@ -1450,7 +1473,7 @@ const StoryBIContent: React.FC = () => {
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-start">Insight Canvas</h2>
+          <h2 className="text-lg font-semibold text-start">لوحة الرؤى</h2>
           {activeTab === 'narrative' ? (
             renderNarrative()
           ) : (
@@ -1486,7 +1509,7 @@ const StoryBIContent: React.FC = () => {
       >
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold">Docked Chat</span>
-          <span className="text-xs text-muted-foreground">Powered by local metrics &amp; dimensions.</span>
+          <span className="text-xs text-muted-foreground">مدعوم بمقاييس وأبعاد محلية.</span>
         </div>
         <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-border/30 bg-muted/10 p-3 text-sm">
           {chatHistory.map((message, index) => (
@@ -1510,7 +1533,7 @@ const StoryBIContent: React.FC = () => {
           <input
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
-            placeholder="Ask for a metric or dimension..."
+            placeholder="اطلب مؤشراً أو بُعداً..."
             className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           <button

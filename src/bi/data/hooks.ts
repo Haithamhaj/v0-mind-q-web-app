@@ -22,8 +22,8 @@ export const useBiMetrics = () => {
 };
 
 export const useBiInsights = () => {
-  const { insights, loading } = useBiDataContext();
-  return { insights, loading };
+  const { insights, loading, insightStats } = useBiDataContext();
+  return { insights, loading, insightStats };
 };
 
 export const useBiCorrelations = () => {
