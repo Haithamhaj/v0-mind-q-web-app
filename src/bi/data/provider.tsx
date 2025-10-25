@@ -26,6 +26,53 @@ const clampRows = (rows: BiDatasetRow[] | undefined | null): BiDatasetRow[] => {
   return rows.slice(0, MAX_ROWS);
 };
 
+const titleCase = (value: string) =>
+  value
+    .toLowerCase()
+    .split(/\s+/g)
+    .filter((token) => token.length > 0)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+
+const normalizeCategoricalValues = (rows: BiDatasetRow[], dimensions: DimensionsCatalog | undefined | null) => {
+  if (!rows.length) {
+    return rows;
+  }
+
+  const categoricalColumns = new Set(
+    (dimensions?.categorical ?? [])
+      .map((dimension) => dimension.name.trim().toLowerCase())
+      .filter((name) => name.length > 0),
+  );
+
+  if (!categoricalColumns.size) {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    const normalized: BiDatasetRow = { ...row };
+    for (const key of Object.keys(row)) {
+      if (!categoricalColumns.has(key.trim().toLowerCase())) {
+        continue;
+      }
+      const value = row[key];
+      if (typeof value !== "string") {
+        continue;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        normalized[key] = "";
+        continue;
+      }
+      const collapsed = trimmed.replace(/\s+/g, " ");
+      const needsTitleCase =
+        collapsed === collapsed.toUpperCase() || collapsed === collapsed.toLowerCase();
+      normalized[key] = needsTitleCase ? titleCase(collapsed) : collapsed;
+    }
+    return normalized;
+  });
+};
+
 const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
   metrics: `${DEFAULT_BASE}/metrics`,
   dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(DEFAULT_RUN)}`,
@@ -79,13 +126,11 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const mergedEndpoints = { ...buildDefaultEndpoints(), ...endpoints };
 
   const [metrics, setMetrics] = useState<MetricSpec[]>(fallbackMetrics.length ? fallbackMetrics : mockMetrics);
-  const [dimensions, setDimensions] = useState<DimensionsCatalog>(
-    fallbackDimensions.date.length ? fallbackDimensions : mockDimensions,
-  );
+  const initialDimensions = fallbackDimensions.date.length ? fallbackDimensions : mockDimensions;
+  const initialDataset = fallbackDataset.length ? clampRows(fallbackDataset) : clampRows(mockDataset);
+  const [dimensions, setDimensions] = useState<DimensionsCatalog>(initialDimensions);
   const [insights, setInsights] = useState<Insight[]>(fallbackInsights.length ? fallbackInsights : mockInsights);
-  const [dataset, setDataset] = useState<BiDatasetRow[]>(
-    fallbackDataset.length ? clampRows(fallbackDataset) : clampRows(mockDataset),
-  );
+  const [dataset, setDataset] = useState<BiDatasetRow[]>(normalizeCategoricalValues(initialDataset, initialDimensions));
   const [correlations, setCorrelations] = useState<CorrelationCollection>(
     fallbackCorrelations,
   );
@@ -109,18 +154,26 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
 
         if (!active) return;
 
-        setMetrics(metricsRes?.length ? metricsRes : fallbackMetrics.length ? fallbackMetrics : mockMetrics);
-        setDimensions(
-          dimensionsRes?.categorical ? dimensionsRes : fallbackDimensions.date.length ? fallbackDimensions : mockDimensions,
-        );
-        setInsights(insightsRes?.length ? insightsRes : fallbackInsights.length ? fallbackInsights : mockInsights);
-        setDataset(
+        const resolvedMetrics = metricsRes?.length ? metricsRes : fallbackMetrics.length ? fallbackMetrics : mockMetrics;
+        const resolvedDimensions =
+          dimensionsRes?.categorical && dimensionsRes.categorical.length
+            ? dimensionsRes
+            : fallbackDimensions.date.length
+              ? fallbackDimensions
+              : mockDimensions;
+        const resolvedInsights = insightsRes?.length ? insightsRes : fallbackInsights.length ? fallbackInsights : mockInsights;
+        const resolvedDatasetSource =
           datasetRes?.length
             ? clampRows(datasetRes)
             : fallbackDataset.length
-            ? clampRows(fallbackDataset)
-            : clampRows(mockDataset),
-        );
+              ? clampRows(fallbackDataset)
+              : clampRows(mockDataset);
+        const resolvedDataset = normalizeCategoricalValues(resolvedDatasetSource, resolvedDimensions);
+
+        setMetrics(resolvedMetrics);
+        setDimensions(resolvedDimensions);
+        setInsights(resolvedInsights);
+        setDataset(resolvedDataset);
         const resolvedCorrelations =
           correlationsRes && Array.isArray(correlationsRes.numeric) && Array.isArray(correlationsRes.datetime)
             ? {

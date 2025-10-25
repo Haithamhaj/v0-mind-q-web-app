@@ -548,6 +548,27 @@ const buildTabs = (metrics: MetricSpec[], categorical: string[]): TabConfig[] =>
   return tabs;
 };
 
+
+const formatInteger = (value?: number | null) => {
+  if (value === null || value === undefined) return '-';
+  return integerFormatter.format(value);
+};
+
+const formatDecimal = (value?: number | null) => {
+  if (value === null || value === undefined) return '-';
+  return decimalFormatter.format(value);
+};
+
+const formatPercent = (value?: number | null) => {
+  if (value === null || value === undefined) return '-';
+  return `${percentFormatter.format(value)}%`;
+};
+
+const formatCurrency = (value?: number | null) => {
+  const formatted = formatDecimal(value);
+  return formatted === '-' ? '—' : `${formatted} SAR`;
+};
+
 const StoryBIContent: React.FC = () => {
   const { translate } = useLanguage();
   const metrics = useBiMetrics();
@@ -666,26 +687,6 @@ const StoryBIContent: React.FC = () => {
   const hourTrendChart = hasChartData(trends?.hour_of_day) ? trends!.hour_of_day : fallbackTrends.hour_of_day;
   
   const hasAnyTrendChart = Boolean(dailyTrendChart || weekdayTrendChart || hourTrendChart);
-  const formatInteger = (value?: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return integerFormatter.format(value);
-  };
-
-  const formatDecimal = (value?: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return decimalFormatter.format(value);
-  };
-
-  const formatPercent = (value?: number | null) => {
-    if (value === null || value === undefined) return '-';
-    return `${percentFormatter.format(value)}%`;
-  };
-
-  const formatCurrency = (value?: number | null) => {
-    const formatted = formatDecimal(value);
-    return formatted === '-' ? '—' : `${formatted} SAR`;
-  };
-
   const computeBreakdownColumns = (values: RawMetricsBreakdownValue[]) => {
     const columns: { key: keyof RawMetricsBreakdownValue; label: string; render: (value: RawMetricsBreakdownValue[keyof RawMetricsBreakdownValue]) => string }[] =
       [
