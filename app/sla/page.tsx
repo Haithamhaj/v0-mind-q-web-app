@@ -53,6 +53,84 @@ interface SlaPayload {
 
 type ChatMessage = { role: "user" | "assistant"; content: string; source?: "local" | "system" | "llm" }
 
+const GATE_REASON_CATEGORY_LABELS: Record<string, string> = {
+  missing_insights: "Missing insight metrics",
+  missing_kpi_reference: "Missing KPI references",
+  sla: "SLA policy",
+  status_enum: "Status enumeration",
+}
+
+const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  ok: "Active",
+  warning: "Warning",
+  warn: "Warning",
+  critical: "Critical",
+  failed: "Critical",
+  pending: "Pending review",
+  unknown: "Unknown status",
+}
+
+const humanizeIdentifier = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+const summarizeGateReason = (reason: string, translate: (key: string, replacements?: Record<string, unknown>) => string, joiner: string) => {
+  if (!reason) {
+    return null
+  }
+  const [categoryRaw, detailsRaw] = reason.split("::")
+  const categoryKey = categoryRaw ? categoryRaw.toLowerCase() : ""
+  const categoryLabel = categoryKey && GATE_REASON_CATEGORY_LABELS[categoryKey]
+    ? translate(GATE_REASON_CATEGORY_LABELS[categoryKey])
+    : humanizeIdentifier(categoryRaw ?? "")
+
+  const detailTokens = detailsRaw
+    ? detailsRaw.split(/[,|]/g).map((token) => humanizeIdentifier(token)).filter((token) => token.length > 0)
+    : []
+
+  if (!detailTokens.length) {
+    return translate("Gate category {category} requires review.", { category: categoryLabel })
+  }
+
+  const limitedDetails = detailTokens.slice(0, 5)
+  const detailsText = limitedDetails.join(joiner)
+  const remaining = detailTokens.length - limitedDetails.length
+
+  return remaining > 0
+    ? translate("Gate category {category} flagged: {details} (+{count} more).", {
+        category: categoryLabel,
+        details: detailsText,
+        count: remaining,
+      })
+    : translate("Gate category {category} flagged: {details}.", { category: categoryLabel, details: detailsText })
+}
+
+const extractDocumentTitle = (document: SlaDocument, translate: (key: string) => string) => {
+  if (document.title && document.title.trim().length > 0) {
+    return document.title.trim()
+  }
+  if (document.id) {
+    const meaningful = document.id.match(/[A-Za-z].+/)
+    if (meaningful && meaningful[0]) {
+      return meaningful[0].replace(/\s+/g, " ").trim()
+    }
+    return document.id
+  }
+  return translate("Untitled document")
+}
+
+const formatDocumentStatus = (status: string | null | undefined, translate: (key: string) => string) => {
+  if (!status) {
+    return translate("Unknown status")
+  }
+  const normalized = status.toLowerCase().replace(/[^a-z]/g, "")
+  const mapped = DOCUMENT_STATUS_LABELS[normalized]
+  return mapped ? translate(mapped) : humanizeIdentifier(status)
+}
+
 const statusPaletteConfig: Record<
   MetricStatus,
   { labelKey: string; colorClass: string; iconClass: string; Icon: typeof CheckCircle2 }
@@ -141,7 +219,36 @@ const SlaPage: React.FC = () => {
   const [assistantLoading, setAssistantLoading] = useState(false)
   const [assistantError, setAssistantError] = useState<string | undefined>()
 
-  const { translate } = useLanguage()
+  const { translate, language } = useLanguage()
+  const listJoiner = language === 'ar' ? '، ' : ', '
+  const formattedGateReasons = useMemo(() => {
+    if (!slaData?.gate?.reasons?.length) {
+      return []
+    }
+    return slaData.gate.reasons
+      .map((reason) => summarizeGateReason(reason, translate, listJoiner))
+      .filter((reason): reason is string => Boolean(reason))
+  }, [listJoiner, slaData, translate])
+
+  const documentSummarySentences = useMemo(() => {
+    if (!slaData?.documents?.length) {
+      return []
+    }
+    return slaData.documents
+      .map((document) => {
+        const title = extractDocumentTitle(document, translate)
+        const compliance = document.compliance != null ? `${Number(document.compliance).toFixed(1)}%` : translate("Awaiting data")
+        const warned = document.warned ?? 0
+        const failed = document.failed ?? 0
+        return translate("Document {title} compliance {score} (warnings {warned}, failed {failed}).", {
+          title,
+          score: compliance,
+          warned,
+          failed,
+        })
+      })
+      .filter((sentence) => sentence && sentence.length > 0)
+  }, [slaData, translate])
   const { openTopic } = useHelpCenter()
   const assistantSectionRef = useRef<HTMLDivElement | null>(null)
   const statusPalette = useMemo<Record<MetricStatus, { label: string; color: string; icon: JSX.Element }>>(() => {
@@ -256,6 +363,7 @@ const SlaPage: React.FC = () => {
 
   const overviewSummary = useMemo(() => {
     if (!slaData) return null
+
     const points: string[] = []
 
     const statusEntry = statusPalette[normalizeStatus(slaData.overall.status)]
@@ -267,18 +375,12 @@ const SlaPage: React.FC = () => {
       }),
     )
 
-    if (slaData.gate?.reasons?.length) {
-      const highlightedReasons = slaData.gate.reasons.slice(0, 2).join(" • ")
-      const remainingReasons = slaData.gate.reasons.length - 2
-      points.push(
-        translate("Gate flagged operational reasons: {reasons}.", {
-          reasons: highlightedReasons,
-        }),
-      )
-      if (remainingReasons > 0) {
+    if (formattedGateReasons.length) {
+      points.push(...formattedGateReasons.slice(0, 2))
+      if (formattedGateReasons.length > 2) {
         points.push(
           translate("There are {count} additional gate notes in the detailed section.", {
-            count: remainingReasons,
+            count: formattedGateReasons.length - 2,
           }),
         )
       }
@@ -286,19 +388,12 @@ const SlaPage: React.FC = () => {
       points.push(translate("No gate warnings recorded this run."))
     }
 
-    const documentTitles = (slaData.documents ?? []).map((document) => document.title).filter((title): title is string => Boolean(title))
-    if (documentTitles.length) {
-      const highlightedDocs = documentTitles.slice(0, 2).join(" • ")
-      const remainingDocs = documentTitles.length - 2
-      points.push(
-        translate("Compliance references include: {titles}.", {
-          titles: highlightedDocs,
-        }),
-      )
-      if (remainingDocs > 0) {
+    if (documentSummarySentences.length) {
+      points.push(...documentSummarySentences.slice(0, 2))
+      if (documentSummarySentences.length > 2) {
         points.push(
           translate("{count} additional contract documents were referenced.", {
-            count: remainingDocs,
+            count: documentSummarySentences.length - 2,
           }),
         )
       }
@@ -307,7 +402,7 @@ const SlaPage: React.FC = () => {
     }
 
     return points
-  }, [overallScore, slaData, statusPalette, translate])
+  }, [formattedGateReasons, documentSummarySentences, language, overallScore, slaData, statusPalette, translate])
 
   return (
     <div className="flex h-screen">
@@ -651,7 +746,7 @@ const SlaPage: React.FC = () => {
               <CardContent>
                 {slaLoading ? (
                   <div className="flex min-h-[120px] items-center justify-center text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> جاري التحميل...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {translate("Loading...")}
                   </div>
                 ) : slaData ? (
                   <div className="grid gap-4 md:grid-cols-2">
@@ -685,46 +780,61 @@ const SlaPage: React.FC = () => {
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="transition hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle>الملفات التعاقدية</CardTitle>
-                  <CardDescription>عناصر SLA المرتبطة بالتشغيل الحالي</CardDescription>
+                  <CardTitle>{translate("Contract documents")}</CardTitle>
+                  <CardDescription>{translate("SLA artifacts linked to this run")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
                   {slaData?.documents?.length ? (
-                    slaData.documents.map((doc) => (
-                      <div key={doc.id ?? doc.title ?? Math.random()} className="rounded-lg border border-border/40 bg-card/40 p-3">
-                        <div className="flex flex-col gap-1">
-                          <div className="font-semibold text-foreground">{doc.title ?? "وثيقة غير مسماة"}</div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">المعرف: {doc.id ?? "غير متوفر"}</Badge>
-                            <Badge variant="secondary">الحالة: {doc.status ?? "غير محدد"}</Badge>
-                          </div>
-                          <div className="text-xs">
-                            الامتثال: {doc.compliance != null ? `${doc.compliance}%` : "—"} | البنود: {doc.terms ?? "—"} (✔ {doc.passed ?? "—"}, ⚠ {doc.warned ?? "—"}, ✖ {doc.failed ?? "—"})
+                    slaData.documents.map((document, index) => {
+                      const title = extractDocumentTitle(document, translate)
+                      const statusLabel = formatDocumentStatus(document.status, translate)
+                      const complianceLine = translate("Compliance {compliance} across {terms} terms (passed {passed}, warnings {warned}, failed {failed}).", {
+                        compliance: document.compliance != null ? `${Number(document.compliance).toFixed(1)}%` : translate("Not specified"),
+                        terms: document.terms ?? translate("Not specified"),
+                        passed: document.passed ?? 0,
+                        warned: document.warned ?? 0,
+                        failed: document.failed ?? 0,
+                      })
+                      const identifier = document.id ?? translate("Not specified")
+                      const statusTone = document.status?.toLowerCase().includes("fail") || document.status?.toLowerCase().includes("critical")
+                        ? "bg-destructive/20 text-destructive border-destructive/30"
+                        : document.status?.toLowerCase().includes("warn")
+                          ? "bg-amber-500/20 text-amber-600 border-amber-500/30"
+                          : "bg-emerald-500/20 text-emerald-600 border-emerald-500/30"
+                      return (
+                        <div key={document.id ?? document.title ?? index} className="rounded-lg border border-border/40 bg-card/40 p-3">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="font-semibold text-foreground">{title}</div>
+                              <Badge variant="outline" className={statusTone}>{statusLabel}</Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground">{translate("Document ID: {id}", { id: identifier })}</div>
+                            <div className="text-xs text-muted-foreground">{complianceLine}</div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      )
+                    })
                   ) : (
-                    <div>لا توجد وثائق مرتبطة في هذا التشغيل.</div>
+                    <div>{translate("No contract files were attached for this run.")}</div>
                   )}
                 </CardContent>
               </Card>
 
               <Card className="transition hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle>إنذارات الاعتماد</CardTitle>
-                  <CardDescription>الأسباب التشغيلية التي منعت الامتثال الكامل</CardDescription>
+                  <CardTitle>{translate("Gate alerts")}</CardTitle>
+                  <CardDescription>{translate("Operational reasons preventing full compliance.")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-muted-foreground">
-                  {slaData?.gate.reasons?.length ? (
-                    slaData.gate.reasons.map((reason, idx) => (
+                  {formattedGateReasons.length ? (
+                    formattedGateReasons.map((reason, idx) => (
                       <div key={`${reason}-${idx}`} className="flex items-start gap-2 rounded-lg border border-border/40 bg-card/40 p-3">
                         <AlertCircle className="mt-1 h-4 w-4 text-amber-500" />
                         <span>{reason}</span>
                       </div>
                     ))
                   ) : (
-                    <div>لا توجد إنذارات.</div>
+                    <div>{translate("No gate alerts present.")}</div>
                   )}
                 </CardContent>
               </Card>
