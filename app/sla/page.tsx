@@ -254,6 +254,61 @@ const SlaPage: React.FC = () => {
   const overallScore = slaData?.overall.score_pct ?? null
   const formattedGeneratedAt = formatTimestamp(slaData?.generated_at)
 
+  const overviewSummary = useMemo(() => {
+    if (!slaData) return null
+    const points: string[] = []
+
+    const statusEntry = statusPalette[normalizeStatus(slaData.overall.status)]
+    const scoreText = overallScore !== null ? `${(overallScore * 100).toFixed(1)}%` : translate("Awaiting data")
+    points.push(
+      translate("Overall compliance scored {score} with status {status}.", {
+        score: scoreText,
+        status: statusEntry.label,
+      }),
+    )
+
+    if (slaData.gate?.reasons?.length) {
+      const highlightedReasons = slaData.gate.reasons.slice(0, 2).join(" • ")
+      const remainingReasons = slaData.gate.reasons.length - 2
+      points.push(
+        translate("Gate flagged operational reasons: {reasons}.", {
+          reasons: highlightedReasons,
+        }),
+      )
+      if (remainingReasons > 0) {
+        points.push(
+          translate("There are {count} additional gate notes in the detailed section.", {
+            count: remainingReasons,
+          }),
+        )
+      }
+    } else {
+      points.push(translate("No gate warnings recorded this run."))
+    }
+
+    const documentTitles = (slaData.documents ?? []).map((document) => document.title).filter((title): title is string => Boolean(title))
+    if (documentTitles.length) {
+      const highlightedDocs = documentTitles.slice(0, 2).join(" • ")
+      const remainingDocs = documentTitles.length - 2
+      points.push(
+        translate("Compliance references include: {titles}.", {
+          titles: highlightedDocs,
+        }),
+      )
+      if (remainingDocs > 0) {
+        points.push(
+          translate("{count} additional contract documents were referenced.", {
+            count: remainingDocs,
+          }),
+        )
+      }
+    } else {
+      points.push(translate("No contract files were attached for this run."))
+    }
+
+    return points
+  }, [overallScore, slaData, statusPalette, translate])
+
   return (
     <div className="flex h-screen">
       <Sidebar />
@@ -263,7 +318,7 @@ const SlaPage: React.FC = () => {
           <div className="mx-auto flex max-w-5xl flex-col gap-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
-                <div className="flex items-start gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div>
                     <h1 className="text-3xl font-bold text-foreground">{translate("SLA compliance command center")}</h1>
                     <p className="text-muted-foreground">{translate("Executive overview of contractual adherence and quick intervention guidance.")}</p>
@@ -271,6 +326,7 @@ const SlaPage: React.FC = () => {
                   <HelpTrigger
                     topicId="sla.overview"
                     aria-label={translate("Explain the SLA dashboard")}
+                    variant="link"
                     buildTopic={() => {
                       const runLabel = selectedRun ?? translate("Latest run")
                       const gateStatusLabel =
@@ -316,7 +372,9 @@ const SlaPage: React.FC = () => {
                         },
                       }
                     }}
-                  />
+                  >
+                    {translate("Explain")}
+                  </HelpTrigger>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -346,6 +404,81 @@ const SlaPage: React.FC = () => {
                 </Button>
               </div>
             </div>
+
+            {overviewSummary?.length ? (
+              <Card className="border-border/40 bg-card/80 shadow-sm">
+                <CardHeader className="space-y-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <CardTitle className="text-sm font-semibold text-foreground">{translate("SLA narrative overview")}</CardTitle>
+                      <CardDescription>{translate("Assistant-ready summary linking KPIs to policy documents and gate status.")}</CardDescription>
+                    </div>
+                    <HelpTrigger
+                      topicId="sla.overview"
+                      aria-label={translate("Explain the SLA dashboard")}
+                      variant="link"
+                      buildTopic={() => {
+                        const runLabel = selectedRun ?? translate("Latest run")
+                        const gateStatusLabel =
+                          slaData?.gate?.status
+                            ? statusPalette[normalizeStatus(slaData.gate.status)].label
+                            : translate("Not specified")
+                        return {
+                          title: translate("SLA compliance overview"),
+                          summary: translate(
+                            "This dashboard links SLA policy documents with the automated checks from phases 09 and 10.",
+                          ),
+                          detailItems: [
+                            translate("Current run: {runId}", { runId: runLabel }),
+                            translate("Overall compliance score: {score}", {
+                              score: overallScore !== null ? `${(overallScore * 100).toFixed(1)}%` : translate("Awaiting data"),
+                            }),
+                            translate("Gate status: {status}", { status: gateStatusLabel }),
+                            translate("Last refreshed: {timestamp}", {
+                              timestamp: formattedGeneratedAt ?? translate("Awaiting data"),
+                            }),
+                          ],
+                          sources: [
+                            {
+                              label: translate("SLA Master Agreement"),
+                              description: translate(
+                                "Primary contractual obligations and penalties that govern the KPIs on this page.",
+                              ),
+                            },
+                            {
+                              label: translate("SOP - Logistics Quality v2024"),
+                              description: translate(
+                                "Defines delivery promises, incident thresholds, and escalation workflow feeding these metrics.",
+                              ),
+                            },
+                          ],
+                          suggestedQuestions: [
+                            translate("What is driving the current gate status?"),
+                            translate("Which contracts deteriorated most in this run?"),
+                            translate("What actions should we take before the next cycle?"),
+                          ],
+                          onAsk: () => {
+                            assistantSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                          },
+                        }
+                      }}
+                    >
+                      {translate("Open help center")}
+                    </HelpTrigger>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {overviewSummary.map((entry, index) => (
+                      <li key={`overview-point-${index}`} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                        <span>{entry}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
 
             {runsError && (
               <Card className="border-destructive/40 bg-destructive/10 text-destructive">

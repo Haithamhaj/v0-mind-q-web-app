@@ -3,6 +3,8 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { HelpTrigger } from '@/components/help/help-trigger';
+import { useLanguage } from '@/context/language-context';
 import { CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
 import { ChartContainerChartJS } from '../components/ChartContainerChartJS';
 import {
@@ -547,6 +549,7 @@ const buildTabs = (metrics: MetricSpec[], categorical: string[]): TabConfig[] =>
 };
 
 const StoryBIContent: React.FC = () => {
+  const { translate } = useLanguage();
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
@@ -583,6 +586,59 @@ const StoryBIContent: React.FC = () => {
   const [rawLlmLoading, setRawLlmLoading] = useState(false);
   const [rawLlmError, setRawLlmError] = useState<string | null>(null);
   const breakdowns = rawMetrics?.breakdowns ?? [];
+
+  const biSummary = rawMetrics
+    ? (() => {
+        const summary: string[] = [];
+        const ordersText = rawMetrics.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("Awaiting data");
+        summary.push(
+          translate("Orders processed: {value}", {
+            value: ordersText,
+          }),
+        );
+
+        const codShare = rawMetrics.totals?.orders_cod_share_pct != null
+          ? formatPercent(rawMetrics.totals.orders_cod_share_pct)
+          : translate("Awaiting data");
+        summary.push(
+          translate("Cash-on-delivery share: {value}", {
+            value: codShare,
+          }),
+        );
+
+        const codCollected = rawMetrics.totals?.cod_total != null ? formatCurrency(rawMetrics.totals.cod_total) : translate("Awaiting data");
+        summary.push(
+          translate("Total COD collected: {value}", {
+            value: codCollected,
+          }),
+        );
+
+        if (rawMetrics.order_date_range) {
+          const coverageRange = `${rawMetrics.order_date_range.min ?? translate("Awaiting data")} → ${rawMetrics.order_date_range.max ?? translate("Awaiting data")}`;
+          summary.push(
+            translate("Data coverage: {range}", {
+              range: coverageRange,
+            }),
+          );
+        }
+
+        if (breakdowns?.length) {
+          const topBreakdown = breakdowns[0];
+          const topValue = topBreakdown?.values?.[0];
+          const label = topBreakdown?.label ?? translate("Not specified");
+          const recordedOrders = toNumber(topValue?.orders);
+          const formattedOrders = recordedOrders != null ? formatInteger(recordedOrders) : translate("Awaiting data");
+          summary.push(
+            translate("Top breakdown {label} contributes {value} orders.", {
+              label,
+              value: formattedOrders,
+            }),
+          );
+        }
+
+        return summary;
+      })()
+    : null;
   const trends = rawMetrics?.trends;
   const rawCorrelationData: CorrelationCollection = rawMetrics?.correlations ?? correlations;
   const rawNumericHighlights = rawCorrelationData.numeric.slice(0, 4);
@@ -926,11 +982,117 @@ const StoryBIContent: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 pb-32" dir="rtl">
       <header className="flex flex-col gap-3">
-        <h1 className="text-3xl font-bold tracking-tight text-start">Story-driven BI</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-start">{translate("Story-driven BI")}</h1>
+          <HelpTrigger
+            topicId="bi.overview"
+            aria-label={translate("Explain the BI workspace")}
+            variant="link"
+            buildTopic={() => {
+              const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("Awaiting data")
+              const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("Awaiting data")
+              const coverage = rawMetrics?.order_date_range
+                ? `${rawMetrics.order_date_range.min ?? translate("Awaiting data")} → ${rawMetrics.order_date_range.max ?? translate("Awaiting data")}`
+                : translate("Awaiting data")
+              return {
+                title: translate("Story-driven BI workspace"),
+                summary: translate(
+                  "This page blends curated KPIs, correlations, and AI narratives derived from phases 08-10.",
+                ),
+                detailItems: [
+                  translate("Processed orders: {value}", { value: orders }),
+                  translate("COD share recorded at {value}", { value: codShare }),
+                  translate("Data coverage: {range}", { range: coverage }),
+                ],
+                sources: [
+                  {
+                    label: translate("Phase 08 insights"),
+                    description: translate("Profiling and exploratory analysis feeding this BI story."),
+                  },
+                  {
+                    label: translate("Phase 09 validation"),
+                    description: translate("SLA and business validation gates referenced in the KPIs."),
+                  },
+                  {
+                    label: translate("Phase 10 semantic marts"),
+                    description: translate("Published metrics powering the charts and narratives."),
+                  },
+                ],
+                suggestedQuestions: [
+                  translate("Which dimension is driving the latest KPI swings?"),
+                  translate("What anomalies should I discuss with operations?"),
+                ],
+                onAsk: () => {
+                  setActiveTab('narrative')
+                  setSidePanelOpen(true)
+                },
+              }
+            }}
+          >
+            {translate("Explain")}
+          </HelpTrigger>
+        </div>
         <p className="text-sm text-muted-foreground text-start">
-          Built from Phase 08 insights, Phase 09 validation, and Phase 10 marts. Columns are discovered at runtime; no hardcoded schema.
+          {translate("Built from Phase 08 insights, Phase 09 validation, and Phase 10 marts. Columns are discovered at runtime; no hardcoded schema.")}
         </p>
       </header>
+
+      {biSummary?.length ? (
+        <Card className="border-border/40 bg-background/80 shadow-sm">
+          <CardHeader className="space-y-1">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-semibold text-foreground">{translate("BI narrative overview")}</CardTitle>
+                <CardDescription>{translate("Assistant-ready summary of the current BI dataset and narratives.")}</CardDescription>
+              </div>
+              <HelpTrigger
+                topicId="bi.overview"
+                aria-label={translate("Explain the BI workspace")}
+                variant="link"
+                buildTopic={() => ({
+                  title: translate("Story-driven BI workspace"),
+                  summary: translate("This page blends curated KPIs, correlations, and AI narratives derived from phases 08-10."),
+                  detailItems: biSummary,
+                  sources: [
+                    {
+                      label: translate("Phase 08 insights"),
+                      description: translate("Profiling and exploratory analysis feeding this BI story."),
+                    },
+                    {
+                      label: translate("Phase 09 validation"),
+                      description: translate("SLA and business validation gates referenced in the KPIs."),
+                    },
+                    {
+                      label: translate("Phase 10 semantic marts"),
+                      description: translate("Published metrics powering the charts and narratives."),
+                    },
+                  ],
+                  suggestedQuestions: [
+                    translate("Which dimension is driving the latest KPI swings?"),
+                    translate("What anomalies should I discuss with operations?"),
+                  ],
+                  onAsk: () => {
+                    setActiveTab('narrative');
+                    setSidePanelOpen(true);
+                  },
+                })}
+              >
+                {translate("Open help center")}
+              </HelpTrigger>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              {biSummary.map((entry, index) => (
+                <li key={`bi-summary-${index}`} className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                  <span>{entry}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
 
             {rawMetricsLoading ? (
         <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm text-muted-foreground shadow-sm">

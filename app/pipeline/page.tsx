@@ -432,6 +432,7 @@ export default function PipelinePage() {
                 <HelpTrigger
                   topicId="pipeline.overview"
                   aria-label={translate("Explain the pipeline workflow")}
+                  variant="link"
                   buildTopic={() => ({
                     title: translate("Full pipeline automation overview"),
                     summary: translate(
@@ -447,7 +448,9 @@ export default function PipelinePage() {
                       translate("How can I inspect artifacts after the run finishes?"),
                     ],
                   })}
-                />
+                >
+                  {translate("Explain")}
+                </HelpTrigger>
               </div>
               <p className="text-muted-foreground">{translate("Configure and run the complete Mind-Q pipeline.")}</p>
             </div>
