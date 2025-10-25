@@ -49,6 +49,10 @@ interface SlaPayload {
   performance: { rows: number | null; approve_pct: number | null; reject_pct: number | null; exec_seconds: number | null }
   notes?: string[]
   generated_at?: string
+  provenance?: Record<string, unknown>
+  targets?: Record<string, unknown>
+  sla_results?: Array<Record<string, unknown>>
+  kpi_values?: Record<string, unknown>
 }
 
 type ChatMessage = { role: "user" | "assistant"; content: string; source?: "local" | "system" | "llm" }
@@ -251,6 +255,8 @@ const SlaPage: React.FC = () => {
   }, [slaData, translate])
   const { openTopic } = useHelpCenter()
   const assistantSectionRef = useRef<HTMLDivElement | null>(null)
+  const metricsSectionRef = useRef<HTMLDivElement | null>(null)
+  const documentsSectionRef = useRef<HTMLDivElement | null>(null)
   const statusPalette = useMemo<Record<MetricStatus, { label: string; color: string; icon: JSX.Element }>>(() => {
     const entries = {} as Record<MetricStatus, { label: string; color: string; icon: JSX.Element }>
     (Object.entries(statusPaletteConfig) as Array<[MetricStatus, (typeof statusPaletteConfig)[MetricStatus]]>).forEach(
@@ -265,6 +271,12 @@ const SlaPage: React.FC = () => {
     )
     return entries
   }, [translate])
+
+  const scrollToSection = useCallback((ref: React.RefObject<HTMLElement | null>) => {
+    if (ref?.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }, [])
 
   const currentRunParam = selectedRun ?? "run-latest"
 
@@ -368,6 +380,154 @@ const SlaPage: React.FC = () => {
   const overallScore = slaData?.overall.score_pct ?? null
   const formattedGeneratedAt = formatTimestamp(slaData?.generated_at)
 
+  const companyDisplayName = useMemo(() => {
+    if (!slaData?.documents?.length) {
+      return translate("لم يتم تحميل ملف الشركة بعد")
+    }
+    const preferred =
+      slaData.documents.find((document) => document.title && document.title.trim().length > 0) ?? slaData.documents[0]
+    const raw = preferred?.title ?? preferred?.id ?? ""
+    const cleaned = raw
+      .replace(/\.pdf(\.json)?$/gi, "")
+      .replace(/\d{4,}/g, " ")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+    if (cleaned.length > 0) {
+      return cleaned
+    }
+    return translate("اتفاقية خدمة غير مسماة")
+  }, [slaData, translate])
+
+  const metricsStats = useMemo(() => {
+    const metrics = slaData?.metrics ?? []
+    const stats = { total: metrics.length, bound: 0, pass: 0, warn: 0, stop: 0 }
+    metrics.forEach((metric) => {
+      if (metric.value !== null && metric.value !== undefined) {
+        stats.bound += 1
+      }
+      const status = normalizeStatus(metric.status)
+      if (status === "pass") stats.pass += 1
+      if (status === "warn") stats.warn += 1
+      if (status === "stop") stats.stop += 1
+    })
+    return stats
+  }, [slaData])
+
+  const documentStats = useMemo(() => {
+    const documents = slaData?.documents ?? []
+    const stats = {
+      total: documents.length,
+      pass: 0,
+      warn: 0,
+      stop: 0,
+      unknown: 0,
+      terms: 0,
+      primaryTitle: documents.length ? extractDocumentTitle(documents[0], translate) : undefined,
+    }
+    documents.forEach((document) => {
+      const status = normalizeStatus(document.status)
+      if (status === "pass") stats.pass += 1
+      else if (status === "warn") stats.warn += 1
+      else if (status === "stop") stats.stop += 1
+      else stats.unknown += 1
+      stats.terms += document.terms ?? 0
+    })
+    return stats
+  }, [slaData, translate])
+
+  const targetsCount = useMemo(() => Object.keys(slaData?.targets ?? {}).length, [slaData])
+
+  const summaryCards = useMemo(() => {
+    const provenance = (slaData?.provenance as Record<string, unknown> | undefined) ?? {}
+    const timezoneLabel =
+      typeof provenance?.["timezone"] === "string" ? (provenance["timezone"] as string) : translate("غير محدد")
+    const currencyLabel =
+      typeof provenance?.["currency"] === "string" ? (provenance["currency"] as string) : translate("غير محدد")
+    const boundPercent =
+      metricsStats.total > 0 ? Math.round((metricsStats.bound / Math.max(metricsStats.total, 1)) * 100) : 0
+    const cards: Array<{
+      id: string
+      title: string
+      description: string
+      bullets: string[]
+      actionLabel?: string
+      onAction?: () => void
+    }> = []
+
+    cards.push({
+      id: "profile",
+      title: translate("ملف الشركة"),
+      description: translate("تعريف سريع بجهة التشغيل والعناصر المرجعية المرتبطة بالاتفاقية."),
+      bullets: [
+        translate("العميل: {name}", { name: companyDisplayName }),
+        translate("آخر تشغيل متاح: {run}", { run: slaData?.run ?? translate("بانتظار البيانات") }),
+        translate("آخر تحديث للملفات: {timestamp}", { timestamp: formattedGeneratedAt ?? translate("بانتظار البيانات") }),
+        translate("التوقيت / العملة: {timezone} / {currency}", { timezone: timezoneLabel, currency: currencyLabel }),
+      ],
+      actionLabel: documentStats.total ? translate("عرض تفاصيل العقود") : undefined,
+      onAction: documentStats.total ? () => scrollToSection(documentsSectionRef) : undefined,
+    })
+
+    const metricBullets =
+      metricsStats.total > 0
+        ? [
+            translate("عدد المقاييس المتعقبة: {count}", { count: metricsStats.total }),
+            translate("تم ربط القيم من مرحلة 09 لـ {count} مؤشر ({percent}%).", {
+              count: metricsStats.bound,
+              percent: boundPercent,
+            }),
+            translate("تحذير: {warn} | إيقاف: {stop}", { warn: metricsStats.warn, stop: metricsStats.stop }),
+            translate("عدد العتبات المحددة في targets.json: {count}", { count: targetsCount }),
+          ]
+        : [translate("لم يتم ربط أي مقاييس SLA بعد.")]
+
+    cards.push({
+      id: "commitments",
+      title: translate("التزامات SLA"),
+      description: translate("ملخص المؤشرات المرتبطة بالاتفاقيات وكيفية تغذيتها بالبيانات."),
+      bullets: metricBullets,
+      actionLabel: metricsStats.total ? translate("الانتقال إلى تفاصيل المؤشرات") : undefined,
+      onAction: metricsStats.total ? () => scrollToSection(metricsSectionRef) : undefined,
+    })
+
+    const contractBullets =
+      documentStats.total > 0
+        ? [
+            translate("عدد العقود المرفوعة: {count}", { count: documentStats.total }),
+            translate("إجمالي البنود المتتبعة: {count}", { count: documentStats.terms }),
+            translate("متوافق: {pass} | تحذير: {warn} | إيقاف: {stop}", {
+              pass: documentStats.pass,
+              warn: documentStats.warn,
+              stop: documentStats.stop,
+            }),
+            documentStats.primaryTitle
+              ? translate("أحدث ملف مرفوع: {title}", { title: documentStats.primaryTitle })
+              : translate("لم يتم توفير اسم توضيحي للعقد."),
+          ]
+        : [translate("لم يتم تحميل ملفات عقود حتى الآن.")]
+
+    cards.push({
+      id: "contracts",
+      title: translate("العقود المرفقة"),
+      description: translate("نظرة على الملفات المرفوعة وكيفية تتبع بنودها داخل النظام."),
+      bullets: contractBullets,
+      actionLabel: documentStats.total ? translate("استعراض قائمة العقود") : undefined,
+      onAction: documentStats.total ? () => scrollToSection(documentsSectionRef) : undefined,
+    })
+
+    return cards
+  }, [
+    companyDisplayName,
+    documentStats,
+    formattedGeneratedAt,
+    metricsStats,
+    scrollToSection,
+    slaData,
+    targetsCount,
+    translate,
+  ])
+
   const overviewSummary = useMemo(() => {
     if (!slaData) return null
 
@@ -409,7 +569,7 @@ const SlaPage: React.FC = () => {
     }
 
     return points
-  }, [formattedGateReasons, documentSummarySentences, language, overallScore, slaData, statusPalette, translate])
+  }, [formattedGateReasons, documentSummarySentences, overallScore, slaData, statusPalette, translate])
 
   return (
     <div className="flex h-screen">
@@ -506,6 +666,36 @@ const SlaPage: React.FC = () => {
                 </Button>
               </div>
             </div>
+
+            {summaryCards.length ? (
+              <div className="grid gap-4 lg:grid-cols-3">
+                {summaryCards.map((card) => (
+                  <Card key={card.id} className="transition hover:shadow-lg">
+                    <CardHeader className="space-y-1">
+                      <CardTitle className="text-sm font-semibold text-foreground">{card.title}</CardTitle>
+                      <CardDescription>{card.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2 text-sm text-muted-foreground">
+                        {card.bullets.map((item, index) => (
+                          <li key={`${card.id}-bullet-${index}`} className="flex items-start gap-2">
+                            <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                    {card.actionLabel && card.onAction ? (
+                      <CardAction>
+                        <Button variant="outline" size="sm" onClick={card.onAction}>
+                          {card.actionLabel}
+                        </Button>
+                      </CardAction>
+                    ) : null}
+                  </Card>
+                ))}
+              </div>
+            ) : null}
 
             {overviewSummary?.length ? (
               <Card className="border-border/40 bg-card/80 shadow-sm">
@@ -745,7 +935,7 @@ const SlaPage: React.FC = () => {
               </Card>
             </div>
 
-            <Card className="transition hover:shadow-lg">
+            <Card className="transition hover:shadow-lg" ref={metricsSectionRef}>
               <CardHeader>
                 <CardTitle>المؤشرات الأساسية</CardTitle>
                 <CardDescription>القيم المصدرية من مرحلة 09/10</CardDescription>
@@ -785,7 +975,7 @@ const SlaPage: React.FC = () => {
             </Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="transition hover:shadow-lg">
+              <Card className="transition hover:shadow-lg" ref={documentsSectionRef}>
                 <CardHeader>
                   <CardTitle>{translate("Contract documents")}</CardTitle>
                   <CardDescription>{translate("SLA artifacts linked to this run")}</CardDescription>
