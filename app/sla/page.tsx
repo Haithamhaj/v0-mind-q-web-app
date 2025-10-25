@@ -220,7 +220,7 @@ const SlaPage: React.FC = () => {
   const [assistantError, setAssistantError] = useState<string | undefined>()
 
   const { translate, language } = useLanguage()
-  const listJoiner = language === 'ar' ? '، ' : ', '
+  const listJoiner = language === "ar" ? "، " : ", "
   const formattedGateReasons = useMemo(() => {
     if (!slaData?.gate?.reasons?.length) {
       return []
@@ -306,12 +306,19 @@ const SlaPage: React.FC = () => {
     loadSlaData()
   }, [loadSlaData, refreshToken])
 
-  const improvementIdeas = useMemo(() => {
+  const complianceHighlights = useMemo(() => {
     if (!slaData) return []
-    const notes = slaData.notes ?? []
-    const failures = slaData.rule_failures.map((failure) => `فحص القاعدة ${failure.rule_id ?? "غير معروفة"}: ${failure.message ?? "بدون تفاصيل"}`)
-    return [...failures, ...notes].slice(0, 5)
-  }, [slaData])
+
+    const ruleNotes = (slaData.rule_failures ?? []).map((failure) => {
+      const ruleId = failure.rule_id ? humanizeIdentifier(failure.rule_id) : translate("Unnamed rule")
+      const details = failure.message && failure.message.length > 0 ? failure.message : translate("No details provided")
+      return translate("Rule {rule}: {details}", { rule: ruleId, details })
+    })
+
+    const additionalNotes = (slaData.notes ?? []).filter((note): note is string => typeof note === 'string' && note.length > 0)
+
+    return [...ruleNotes, ...additionalNotes].slice(0, 5)
+  }, [slaData, translate])
 
   const handleAskAssistant = useCallback(async () => {
     if (!assistantInput.trim()) return
@@ -729,8 +736,8 @@ const SlaPage: React.FC = () => {
 
               <Card className="transition hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-sm font-medium">ملاحظات رئيسية</CardTitle>
-                  <CardDescription>تنبيهات أو توصيات مستخلصة من التشغيل</CardDescription>
+                  <CardTitle className="text-sm font-medium">{translate("Key compliance notes")}</CardTitle>
+                  <CardDescription>{translate("Alerts or recommendations derived from this run.")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   {improvementIdeas.length ? improvementIdeas.map((idea, idx) => <div key={`${idea}-${idx}`}>- {idea}</div>) : <div>لا توجد ملاحظات إضافية.</div>}
@@ -808,7 +815,7 @@ const SlaPage: React.FC = () => {
                               <div className="font-semibold text-foreground">{title}</div>
                               <Badge variant="outline" className={statusTone}>{statusLabel}</Badge>
                             </div>
-                            <div className="text-xs text-muted-foreground">{translate("Document ID: {id}", { id: identifier })}</div>
+                            <div className="break-all text-xs text-muted-foreground">{translate("Document ID: {id}", { id: identifier })}</div>
                             <div className="text-xs text-muted-foreground">{complianceLine}</div>
                           </div>
                         </div>
@@ -843,7 +850,7 @@ const SlaPage: React.FC = () => {
             <div ref={assistantSectionRef}>
               <Card className="transition hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle>المساعد الذكي للامتثال</CardTitle>
+                  <CardTitle>{translate("Intelligent compliance assistant")}</CardTitle>
                 <CardDescription>يولّد إجابات تنفيذية اعتمادًا على أحدث بيانات SLA</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
