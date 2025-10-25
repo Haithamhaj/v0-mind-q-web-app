@@ -349,6 +349,9 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
                   ...(fallbackCorrelations.sources ?? {}),
                   ...(correlationsRes.sources ?? {}),
                 },
+                run: correlationsRes.run ?? fallbackCorrelations.run ?? "run-latest",
+                artifacts_root: correlationsRes.artifacts_root ?? fallbackCorrelations.artifacts_root ?? null,
+                top: correlationsRes.top ?? fallbackCorrelations.top ?? null,
               }
             : fallbackCorrelations;
         setCorrelations(resolvedCorrelations);

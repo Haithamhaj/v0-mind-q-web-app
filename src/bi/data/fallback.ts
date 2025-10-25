@@ -81,5 +81,7 @@ export const fallbackCorrelations: CorrelationCollection = {
     categorical_categorical: [],
   },
   sources: {},
+  run: "fallback",
+  artifacts_root: null,
+  top: null,
 };
-

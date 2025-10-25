@@ -1,11 +1,15 @@
 'use client';
 
-import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HelpTrigger } from '@/components/help/help-trigger';
 import { useLanguage } from '@/context/language-context';
-import { CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel } from '../components';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel, correlationPairKey } from '../components';
 import { ChartContainerChartJS } from '../components/ChartContainerChartJS';
 import {
   BiDataProvider,
@@ -16,7 +20,7 @@ import {
   useBiMetrics,
   useBiCorrelations,
 } from '../data';
-import type { CorrelationCollection, Insight, MetricSpec } from '../data';
+import type { CorrelationCollection, CorrelationPair, Insight, MetricSpec } from '../data';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -63,6 +67,22 @@ type RawMetricsTrends = {
   weekday?: RawMetricsChart;
 };
 
+type CorrelationExplanationPayload = {
+  summary?: string;
+  recommended_actions?: string[];
+  confidence?: string | null;
+  mode?: string | null;
+  provider?: string | null;
+  model?: string | null;
+};
+
+type CorrelationFilterState = {
+  kpi: string;
+  domain: string;
+  direction: string;
+  persistentOnly: boolean;
+};
+
 type ChartSeriesMeta = {
   key: keyof RawMetricsBreakdownValue;
   label: string;
@@ -93,6 +113,13 @@ type TrendBuckets = {
 };
 
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+const DEFAULT_CORRELATION_FILTER: CorrelationFilterState = {
+  kpi: "all",
+  domain: "all",
+  direction: "all",
+  persistentOnly: false,
+};
 
 const toNumber = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -570,13 +597,14 @@ const formatCurrency = (value?: number | null) => {
 };
 
 const StoryBIContent: React.FC = () => {
-  const { translate } = useLanguage();
+  const { translate, language } = useLanguage();
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
   const { setFilter } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
+  const activeRun = correlations.run ?? 'run-latest';
 
   const insightTypeLabel = (type: string) => {
     switch (type) {
@@ -598,9 +626,6 @@ const StoryBIContent: React.FC = () => {
 
   const tabs = useMemo(() => buildTabs(metrics, categoricalNames), [metrics, categoricalNames]);
 
-  const numericHighlights = useMemo(() => correlations.numeric.slice(0, 6), [correlations.numeric]);
-  const datetimeHighlights = useMemo(() => correlations.datetime.slice(0, 6), [correlations.datetime]);
-
   const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? 'narrative');
   const [selectedKpi, setSelectedKpi] = useState<string | null>(tabs[0]?.metricId ?? metrics[0]?.id ?? null);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -620,6 +645,210 @@ const StoryBIContent: React.FC = () => {
   const [rawLlmLoading, setRawLlmLoading] = useState(false);
   const [rawLlmError, setRawLlmError] = useState<string | null>(null);
   const breakdowns = useMemo(() => rawMetrics?.breakdowns ?? [], [rawMetrics]);
+  const [correlationFilterState, setCorrelationFilterState] = useState<CorrelationFilterState>(DEFAULT_CORRELATION_FILTER);
+  const [correlationExplanations, setCorrelationExplanations] = useState<Record<string, CorrelationExplanationPayload>>({});
+  const [correlationExplainingKey, setCorrelationExplainingKey] = useState<string | null>(null);
+  const [correlationError, setCorrelationError] = useState<string | null>(null);
+
+  const determineDriverDomain = useCallback((item: CorrelationPair): string | null => {
+    if (item.driver_domain) {
+      return item.driver_domain;
+    }
+    if (item.kpi_feature) {
+      if (item.kpi_feature === item.feature_a) {
+        return item.feature_b_domain ?? item.feature_a_domain ?? null;
+      }
+      if (item.kpi_feature === item.feature_b) {
+        return item.feature_a_domain ?? item.feature_b_domain ?? null;
+      }
+    }
+    return item.feature_b_domain ?? item.feature_a_domain ?? null;
+  }, []);
+
+  const determineDirection = useCallback((item: CorrelationPair): "improves" | "worsens" | "neutral" => {
+    if (item.effect_direction === "improves" || item.effect_direction === "worsens") {
+      return item.effect_direction;
+    }
+    if (typeof item.correlation === "number") {
+      if (item.correlation < 0) {
+        return "worsens";
+      }
+      if (item.correlation > 0) {
+        return "improves";
+      }
+    }
+    return "neutral";
+  }, []);
+
+  const allCorrelationItems = useMemo(() => {
+    const items: CorrelationPair[] = [];
+    if (Array.isArray(correlations.numeric)) {
+      items.push(...correlations.numeric);
+    }
+    if (Array.isArray(correlations.datetime)) {
+      items.push(...correlations.datetime);
+    }
+    if (correlations.business) {
+      if (Array.isArray(correlations.business.numeric_numeric)) {
+        items.push(...correlations.business.numeric_numeric);
+      }
+      if (Array.isArray(correlations.business.numeric_categorical)) {
+        items.push(...correlations.business.numeric_categorical);
+      }
+      if (Array.isArray(correlations.business.categorical_categorical)) {
+        items.push(...correlations.business.categorical_categorical);
+      }
+    }
+    return items;
+  }, [correlations]);
+
+  const correlationKpiOptions = useMemo(() => {
+    const entries = new Map<string, string>();
+    allCorrelationItems.forEach((item) => {
+      const key = item.kpi_tag ?? item.kpi_label;
+      if (!key) {
+        return;
+      }
+      const label = item.kpi_label ?? key;
+      entries.set(key, label);
+    });
+    return Array.from(entries.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  }, [allCorrelationItems]);
+
+  const correlationDomainOptions = useMemo(() => {
+    const domains = new Set<string>();
+    allCorrelationItems.forEach((item) => {
+      const domain = determineDriverDomain(item);
+      if (domain) {
+        domains.add(domain);
+      }
+    });
+    return Array.from(domains.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [allCorrelationItems, determineDriverDomain]);
+
+  const directionOptions = useMemo(
+    () => [
+      { value: "all", label: "كل الاتجاهات" },
+      { value: "improves", label: "يرتبط بتحسّن KPI" },
+      { value: "worsens", label: "يرتبط بتدهور KPI" },
+    ],
+    [],
+  );
+
+  const isCorrelationFilterActive = useMemo(
+    () =>
+      correlationFilterState.kpi !== "all" ||
+      correlationFilterState.domain !== "all" ||
+      correlationFilterState.direction !== "all" ||
+      correlationFilterState.persistentOnly,
+    [correlationFilterState],
+  );
+
+  const handleCorrelationFilterChange = useCallback(
+    (key: keyof CorrelationFilterState, value: string) => {
+      setCorrelationFilterState((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const handleCorrelationPersistenceToggle = useCallback((checked: boolean) => {
+    setCorrelationFilterState((prev) => ({ ...prev, persistentOnly: checked }));
+  }, []);
+
+  const resetCorrelationFilters = useCallback(() => {
+    setCorrelationFilterState(DEFAULT_CORRELATION_FILTER);
+  }, []);
+
+  const applyCorrelationFilters = useCallback(
+    (items: CorrelationPair[]) =>
+      items.filter((item) => {
+        const kpiValue = item.kpi_tag ?? item.kpi_label ?? "";
+        if (correlationFilterState.kpi !== "all" && kpiValue !== correlationFilterState.kpi) {
+          return false;
+        }
+        const direction = determineDirection(item);
+        if (correlationFilterState.direction !== "all" && direction !== correlationFilterState.direction) {
+          return false;
+        }
+        if (correlationFilterState.persistentOnly && !item.is_persistent) {
+          return false;
+        }
+        const domain = determineDriverDomain(item);
+        if (correlationFilterState.domain !== "all" && domain !== correlationFilterState.domain) {
+          return false;
+        }
+        return true;
+      }),
+    [correlationFilterState, determineDirection, determineDriverDomain],
+  );
+
+  const numericHighlights = useMemo(
+    () => applyCorrelationFilters(correlations.numeric ?? []).slice(0, 6),
+    [correlations.numeric, applyCorrelationFilters],
+  );
+  const datetimeHighlights = useMemo(
+    () => applyCorrelationFilters(correlations.datetime ?? []).slice(0, 6),
+    [correlations.datetime, applyCorrelationFilters],
+  );
+  const businessGroups = useMemo(
+    () =>
+      correlations.business ?? {
+        numeric_numeric: [],
+        numeric_categorical: [],
+        categorical_categorical: [],
+      },
+    [correlations.business],
+  );
+  const businessNumericHighlights = useMemo(
+    () => applyCorrelationFilters(businessGroups.numeric_numeric ?? []).slice(0, 6),
+    [businessGroups.numeric_numeric, applyCorrelationFilters],
+  );
+  const businessNumericCategoricalHighlights = useMemo(
+    () => applyCorrelationFilters(businessGroups.numeric_categorical ?? []).slice(0, 6),
+    [businessGroups.numeric_categorical, applyCorrelationFilters],
+  );
+  const businessCategoricalHighlights = useMemo(
+    () => applyCorrelationFilters(businessGroups.categorical_categorical ?? []).slice(0, 6),
+    [businessGroups.categorical_categorical, applyCorrelationFilters],
+  );
+
+  const handleExplainCorrelation = useCallback(
+    async (item: CorrelationPair) => {
+      const key = correlationPairKey(item);
+      setCorrelationError(null);
+      setCorrelationExplainingKey(key);
+      try {
+        const response = await fetch('/api/bi/correlations/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            run: activeRun,
+            feature_a: item.feature_a,
+            feature_b: item.feature_b,
+            kind: item.kind ?? 'numeric',
+            language,
+            use_llm: true,
+          }),
+        });
+        if (!response.ok) {
+          const detail = await response.text();
+          throw new Error(detail || `Failed to generate explanation (${response.status})`);
+        }
+        const data = await response.json();
+        const payload: CorrelationExplanationPayload = data?.explanation ?? {};
+        setCorrelationExplanations((prev) => ({ ...prev, [key]: payload }));
+      } catch (error) {
+        console.error('[story-bi] correlation explain failed', error);
+        setCorrelationError(error instanceof Error ? error.message : 'تعذر توليد الشرح');
+      } finally {
+        setCorrelationExplainingKey(null);
+      }
+    },
+    [activeRun, language],
+  );
+
 
   const biSummary = rawMetrics
     ? (() => {
@@ -685,15 +914,7 @@ const StoryBIContent: React.FC = () => {
   const rawBusinessNumeric = rawBusinessGroups.numeric_numeric.slice(0, 4);
   const rawBusinessNumericCategorical = rawBusinessGroups.numeric_categorical.slice(0, 4);
   const rawBusinessCategorical = rawBusinessGroups.categorical_categorical.slice(0, 4);
-  const businessGroups = correlations.business ?? {
-    numeric_numeric: [],
-    numeric_categorical: [],
-    categorical_categorical: [],
-  };
-  const businessNumericHighlights = businessGroups.numeric_numeric.slice(0, 6);
-  const businessNumericCategoricalHighlights = businessGroups.numeric_categorical.slice(0, 6);
-  const businessCategoricalHighlights = businessGroups.categorical_categorical.slice(0, 6);
-  const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
+const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
   const fallbackTrends = useMemo(() => buildTrendFallback(dataset as Record<string, unknown>[]), [dataset]);
   const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
   const weekdayTrendChart = hasChartData(trends?.weekday) ? trends!.weekday : fallbackTrends.weekday;
@@ -1399,6 +1620,65 @@ const StoryBIContent: React.FC = () => {
 
       <FilterBar />
 
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border/60 bg-background/70 p-3 shadow-sm" dir="rtl">
+        <Select value={correlationFilterState.kpi} onValueChange={(value) => handleCorrelationFilterChange('kpi', value)}>
+          <SelectTrigger className="w-[220px] justify-between">
+            <SelectValue placeholder="كل مؤشرات الأداء" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">كل مؤشرات الأداء</SelectItem>
+            {correlationKpiOptions.map((option) => (
+              <SelectItem key={`kpi-${option.value}`} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={correlationFilterState.domain} onValueChange={(value) => handleCorrelationFilterChange('domain', value)}>
+          <SelectTrigger className="w-[200px] justify-between">
+            <SelectValue placeholder="كل المجالات" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">كل المجالات</SelectItem>
+            {correlationDomainOptions.map((domain) => (
+              <SelectItem key={`domain-${domain}`} value={domain}>
+                {domain}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={correlationFilterState.direction} onValueChange={(value) => handleCorrelationFilterChange('direction', value)}>
+          <SelectTrigger className="w-[200px] justify-between">
+            <SelectValue placeholder="اتجاه الارتباط" />
+          </SelectTrigger>
+          <SelectContent>
+            {directionOptions.map((option) => (
+              <SelectItem key={`direction-${option.value}`} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-3 py-2">
+          <Switch id="correlation-persistent-only" checked={correlationFilterState.persistentOnly} onCheckedChange={handleCorrelationPersistenceToggle} />
+          <Label htmlFor="correlation-persistent-only" className="text-xs text-muted-foreground">
+            عرض الأنماط المستقرة فقط
+          </Label>
+        </div>
+
+        <Button type="button" variant="ghost" size="sm" onClick={resetCorrelationFilters} disabled={!isCorrelationFilterActive}>
+          إعادة التصفية
+        </Button>
+      </div>
+      {correlationError ? (
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive-foreground" dir="rtl">
+          فشل توليد الشرح: {correlationError}
+        </div>
+      ) : null}
+
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricSummaries.map((summary) => {
           const hasTime = (metrics.find((item) => item.id === summary.metric.id)?.time_col ?? null) !== null;
@@ -1444,30 +1724,45 @@ const StoryBIContent: React.FC = () => {
           items={numericHighlights}
           limit={6}
           emptyMessage="لا توجد ارتباطات عددية متاحة."
+          onExplain={handleExplainCorrelation}
+          explanations={correlationExplanations}
+          explainingKey={correlationExplainingKey}
         />
         <CorrelationListCard
           title="أبرز الارتباطات الزمنية"
           items={datetimeHighlights}
           limit={6}
           emptyMessage="لا توجد ارتباطات زمنية متاحة."
+          onExplain={handleExplainCorrelation}
+          explanations={correlationExplanations}
+          explainingKey={correlationExplainingKey}
         />
         <CorrelationListCard
           title="روابط أعمال"
           items={businessNumericHighlights}
           limit={6}
           emptyMessage="لا توجد روابط أعمال حالياً."
+          onExplain={handleExplainCorrelation}
+          explanations={correlationExplanations}
+          explainingKey={correlationExplainingKey}
         />
         <CorrelationListCard
           title="أثر الفئات على المقاييس"
           items={businessNumericCategoricalHighlights}
           limit={6}
           emptyMessage="لا توجد روابط فئوية حالياً."
+          onExplain={handleExplainCorrelation}
+          explanations={correlationExplanations}
+          explainingKey={correlationExplainingKey}
         />
         <CorrelationListCard
           title="روابط فئات متبادلة"
           items={businessCategoricalHighlights}
           limit={6}
           emptyMessage="لا توجد روابط فئات متاحة."
+          onExplain={handleExplainCorrelation}
+          explanations={correlationExplanations}
+          explainingKey={correlationExplainingKey}
         />
       </section>
 
@@ -1559,6 +1854,12 @@ export const StoryBIPage: React.FC = () => {
 };
 
 export default StoryBIPage;
+
+
+
+
+
+
 
 
 

@@ -69,6 +69,32 @@ export type CorrelationPair = {
   kind?: string;
   method?: string;
   source?: string | null;
+  p_value?: number | null;
+  feature_a_label?: string;
+  feature_b_label?: string;
+  feature_a_domain?: string;
+  feature_b_domain?: string;
+  feature_a_sensitivity?: string;
+  feature_b_sensitivity?: string;
+  feature_a_description?: string;
+  feature_b_description?: string;
+  business_label?: string;
+  impact_summary?: string;
+  sensitivity?: string;
+  kpi_tag?: string | null;
+  kpi_label?: string | null;
+  kpi_direction?: string | null;
+  kpi_unit?: string | null;
+  kpi_feature?: string | null;
+  impact_driver_feature?: string | null;
+  impact_driver_label?: string | null;
+  effect_direction?: string | null;
+  effect_is_positive?: boolean | null;
+  expected_kpi_delta?: number | null;
+  expected_kpi_delta_pct?: number | null;
+  driver_domain?: string | null;
+  is_persistent?: boolean;
+  history_runs?: string[];
 };
 
 export type BusinessCorrelation = {
@@ -80,6 +106,32 @@ export type BusinessCorrelation = {
   method?: string;
   kind?: string;
   notes?: Record<string, unknown>;
+  p_value?: number | null;
+  feature_a_label?: string;
+  feature_b_label?: string;
+  feature_a_domain?: string;
+  feature_b_domain?: string;
+  feature_a_sensitivity?: string;
+  feature_b_sensitivity?: string;
+  feature_a_description?: string;
+  feature_b_description?: string;
+  business_label?: string;
+  impact_summary?: string;
+  sensitivity?: string;
+  kpi_tag?: string | null;
+  kpi_label?: string | null;
+  kpi_direction?: string | null;
+  kpi_unit?: string | null;
+  kpi_feature?: string | null;
+  impact_driver_feature?: string | null;
+  impact_driver_label?: string | null;
+  effect_direction?: string | null;
+  effect_is_positive?: boolean | null;
+  expected_kpi_delta?: number | null;
+  expected_kpi_delta_pct?: number | null;
+  driver_domain?: string | null;
+  is_persistent?: boolean;
+  history_runs?: string[];
 };
 
 export type BusinessCorrelationGroups = {
@@ -97,6 +149,9 @@ export type CorrelationCollection = {
     datetime?: string | null;
     business?: string | null;
   };
+  run?: string | null;
+  artifacts_root?: string | null;
+  top?: number | null;
 };
 
 export type InsightStats = {
