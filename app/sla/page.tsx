@@ -118,9 +118,9 @@ const formatNumber = (value: number | null | undefined, fractionDigits = 2) => {
 
 const formatDuration = (seconds: number | null | undefined) => {
   if (!seconds) return "-"
-  if (seconds < 60) return ${Math.round(seconds)} s
-  if (seconds < 3600) return ${(seconds / 60).toFixed(1)} min
-  return ${(seconds / 3600).toFixed(1)} h
+  if (seconds < 60) return `${Math.round(seconds)} s`
+  if (seconds < 3600) return `${(seconds / 60).toFixed(1)} min`
+  return `${(seconds / 3600).toFixed(1)} h`
 }
 
 const formatDate = (value?: string | null, locale = "ar-SA") => {
@@ -187,8 +187,8 @@ const SlaPage: React.FC = () => {
     setSlaLoading(true)
     setSlaError(undefined)
     try {
-      const response = await fetch(/api/bi/sla?run=)
-      if (!response.ok) throw new Error(HTTP )
+      const response = await fetch(`/api/bi/sla?run=${encodeURIComponent(currentRunParam)}`)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const payload = (await response.json()) as SlaPayload
       setSlaData(payload)
     } catch (error) {
@@ -326,9 +326,9 @@ const SlaPage: React.FC = () => {
                     <div>
                       <h3 className="mb-2 text-sm font-medium">{translate("التوصيات القادمة")}</h3>
                       <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                        {nextActions.map((action, index) => (
-                          <li key={${action}-}>{action}</li>
-                        ))}
+                    {nextActions.map((action, index) => (
+                      <li key={`${index}-${action}`}>{action}</li>
+                    ))}
                       </ul>
                     </div>
                   )}
@@ -362,8 +362,10 @@ const SlaPage: React.FC = () => {
                           </div>
                           <dl className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
                             <div>
-                              <dt>{translate("معدل الامتثال")}</dt>
-                              <dd className="text-sm font-medium text-foreground">{compliance !== undefined && compliance !== null ? ${compliance.toFixed(1)}% : "-"}</dd>
+                      <dt>{translate("معدل الامتثال")}</dt>
+                      <dd className="text-sm font-medium text-foreground">
+                        {compliance !== undefined && compliance !== null ? `${compliance.toFixed(1)}%` : "-"}
+                      </dd>
                             </div>
                             <div>
                               <dt>{translate("بنود متطابقة")}</dt>
@@ -379,7 +381,7 @@ const SlaPage: React.FC = () => {
                               <p className="text-xs font-medium text-muted-foreground">{translate("المؤشرات المرتبطة")}</p>
                               <ul className="mt-1 space-y-1 text-xs">
                                 {document.kpi_refs.map((ref) => (
-                                  <li key={${document.id}-} className="flex items-center gap-2">
+                                  <li key={`${document.id ?? document.title ?? "doc"}-${ref.kpi_id}`} className="flex items-center gap-2">
                                     <span className="font-medium text-foreground">{ref.label || ref.kpi_id}</span>
                                     {ref.value_pct !== undefined && ref.value_pct !== null && (
                                       <span className="text-muted-foreground">{ref.value_pct.toFixed(1)}%</span>
@@ -423,16 +425,16 @@ const SlaPage: React.FC = () => {
                             <Badge className={config.badge}>{statusLabel(kpi.status, translate)}</Badge>
                           </div>
                           <div className="mt-3 text-2xl font-semibold text-foreground">
-                            {kpi.value_pct !== undefined && kpi.value_pct !== null ? ${kpi.value_pct.toFixed(1)}% : formatNumber(kpi.raw_value)}
+                            {kpi.value_pct !== undefined && kpi.value_pct !== null ? `${kpi.value_pct.toFixed(1)}%` : formatNumber(kpi.raw_value)}
                           </div>
                           <dl className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
                             <div>
                               <dt>{translate("حد التحذير")}</dt>
-                              <dd>{kpi.warn_threshold_pct !== undefined && kpi.warn_threshold_pct !== null ? ${kpi.warn_threshold_pct.toFixed(1)}% : "-"}</dd>
+                              <dd>{kpi.warn_threshold_pct !== undefined && kpi.warn_threshold_pct !== null ? `${kpi.warn_threshold_pct.toFixed(1)}%` : "-"}</dd>
                             </div>
                             <div>
                               <dt>{translate("حد الإيقاف")}</dt>
-                              <dd>{kpi.stop_threshold_pct !== undefined && kpi.stop_threshold_pct !== null ? ${kpi.stop_threshold_pct.toFixed(1)}% : "-"}</dd>
+                              <dd>{kpi.stop_threshold_pct !== undefined && kpi.stop_threshold_pct !== null ? `${kpi.stop_threshold_pct.toFixed(1)}%` : "-"}</dd>
                             </div>
                           </dl>
                         </div>
@@ -494,12 +496,18 @@ const SlaPage: React.FC = () => {
                             <td className="px-2 py-2 font-medium">{attachment.name}</td>
                             <td className="px-2 py-2 text-muted-foreground">{attachment.media_type ?? "-"}</td>
                             <td className="px-2 py-2 text-muted-foreground">
-                              {attachment.size_bytes ? ${(attachment.size_bytes / 1024).toFixed(1)} KB : "-"}
+                              {attachment.size_bytes ? `${(attachment.size_bytes / 1024).toFixed(1)} KB` : "-"}
                             </td>
                             <td className="px-2 py-2 text-right">
                               {attachment.stored_path ? (
-                                <Button variant="ghost" size="sm" className="text-muted-foreground"
-                                  onClick={() => window.open(/api/mindq/v1/runs//artifacts/content?path=, "_blank")}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-muted-foreground"
+                                  onClick={() => {
+                                    const url = `/api/mindq/v1/runs/${encodeURIComponent(currentRunParam)}/artifacts/content?path=${encodeURIComponent(attachment.stored_path ?? "")}`
+                                    window.open(url, "_blank")
+                                  }}
                                 >
                                   <Download className="mr-2 h-4 w-4" />
                                   {translate("تحميل")}
