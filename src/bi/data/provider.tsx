@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { fallbackCorrelations, fallbackDataset, fallbackDimensions, fallbackInsights, fallbackMetrics } from "./fallback";
-import { mockDataset, mockDimensions, mockInsights, mockMetrics } from "./mocks";
 import {
   BiDataContextValue,
   BiDatasetRow,
@@ -27,6 +26,21 @@ const DEFAULT_BASE = process.env.NEXT_PUBLIC_BI_BASE ?? "/api/bi";
 const DEFAULT_RUN = process.env.NEXT_PUBLIC_BI_RUN ?? "run-latest";
 
 const BiDataContext = createContext<BiDataContextValue | undefined>(undefined);
+
+const EMPTY_DIMENSIONS: DimensionsCatalog = { date: [], numeric: [], categorical: [], bool: [] };
+const EMPTY_CORRELATIONS: CorrelationCollection = {
+  numeric: [],
+  datetime: [],
+  business: {
+    numeric_numeric: [],
+    numeric_categorical: [],
+    categorical_categorical: [],
+  },
+  sources: undefined,
+  run: undefined,
+  artifacts_root: undefined,
+  top: undefined,
+};
 
 const clampRows = (rows: BiDatasetRow[] | undefined | null): BiDatasetRow[] => {
   if (!rows?.length) {
@@ -141,7 +155,7 @@ const normalizeCategoricalValues = (rows: BiDatasetRow[], dimensions: Dimensions
 };
 
 const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
-  metrics: `${DEFAULT_BASE}/metrics`,
+  metrics: `${DEFAULT_BASE}/metrics?run=${encodeURIComponent(DEFAULT_RUN)}`,
   dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(DEFAULT_RUN)}`,
   insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(DEFAULT_RUN)}`,
   dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(DEFAULT_RUN)}`,
@@ -204,7 +218,7 @@ const normaliseMetricsPayload = (payload: unknown) => {
         : Object.fromEntries(Object.entries(payload).filter(([key]) => key !== "metrics"));
     return { metrics, metadata };
   }
-  return { metrics: fallbackMetrics.length ? fallbackMetrics : mockMetrics, metadata: {} as Record<string, unknown> };
+  return { metrics: fallbackMetrics.length ? fallbackMetrics : [], metadata: {} as Record<string, unknown> };
 };
 
 const normaliseDimensionsPayload = (payload: unknown) => {
@@ -227,7 +241,7 @@ const normaliseDimensionsPayload = (payload: unknown) => {
     return { catalog, metadata };
   }
   return {
-    catalog: fallbackDimensions.date.length ? fallbackDimensions : mockDimensions,
+    catalog: fallbackDimensions.date.length ? fallbackDimensions : EMPTY_DIMENSIONS,
     metadata: {} as Record<string, unknown>,
   };
 };
@@ -258,7 +272,7 @@ const normaliseInsightsPayload = (payload: unknown) => {
     return { insights: payload as Insight[], stats: undefined, metadata: {} as Record<string, unknown> };
   }
   return {
-    insights: fallbackInsights.length ? fallbackInsights : mockInsights,
+    insights: fallbackInsights.length ? fallbackInsights : [],
     stats: undefined,
     metadata: {} as Record<string, unknown>,
   };
@@ -267,15 +281,11 @@ const normaliseInsightsPayload = (payload: unknown) => {
 export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoints }) => {
   const mergedEndpoints = { ...buildDefaultEndpoints(), ...endpoints };
 
-  const [metrics, setMetrics] = useState<MetricSpec[]>(fallbackMetrics.length ? fallbackMetrics : mockMetrics);
-  const initialDimensions = fallbackDimensions.date.length ? fallbackDimensions : mockDimensions;
-  const initialDataset = fallbackDataset.length ? clampRows(fallbackDataset) : clampRows(mockDataset);
-  const [dimensions, setDimensions] = useState<DimensionsCatalog>(initialDimensions);
-  const [insights, setInsights] = useState<Insight[]>(fallbackInsights.length ? fallbackInsights : mockInsights);
-  const [dataset, setDataset] = useState<BiDatasetRow[]>(normalizeCategoricalValues(initialDataset, initialDimensions));
-  const [correlations, setCorrelations] = useState<CorrelationCollection>(
-    fallbackCorrelations,
-  );
+  const [metrics, setMetrics] = useState<MetricSpec[]>([]);
+  const [dimensions, setDimensions] = useState<DimensionsCatalog>(EMPTY_DIMENSIONS);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [dataset, setDataset] = useState<BiDatasetRow[]>([]);
+  const [correlations, setCorrelations] = useState<CorrelationCollection>(EMPTY_CORRELATIONS);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | undefined>();
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -289,18 +299,18 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       setLoading(true);
       try {
         const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes] = await Promise.all([
-          fetchJson<unknown>(mergedEndpoints.metrics, { metrics: fallbackMetrics }),
-          fetchJson<unknown>(mergedEndpoints.dimensions, fallbackDimensions),
-          fetchJson<unknown>(mergedEndpoints.insights, { insights: fallbackInsights }),
-          fetchDataset(mergedEndpoints.dataset, fallbackDataset),
-          fetchJson<CorrelationCollection>(mergedEndpoints.correlations, fallbackCorrelations),
+          fetchJson<unknown>(mergedEndpoints.metrics, { metrics: [] }),
+          fetchJson<unknown>(mergedEndpoints.dimensions, EMPTY_DIMENSIONS),
+          fetchJson<unknown>(mergedEndpoints.insights, { insights: [] }),
+          fetchDataset(mergedEndpoints.dataset, []),
+          fetchJson<CorrelationCollection>(mergedEndpoints.correlations, EMPTY_CORRELATIONS),
         ]);
 
         if (!active) return;
 
         const metricsPayload = normaliseMetricsPayload(metricsRes);
         const resolvedMetrics =
-          metricsPayload.metrics.length > 0 ? metricsPayload.metrics : fallbackMetrics.length ? fallbackMetrics : mockMetrics;
+          metricsPayload.metrics.length > 0 ? metricsPayload.metrics : fallbackMetrics.length ? fallbackMetrics : [];
         const dimensionsPayload = normaliseDimensionsPayload(dimensionsRes);
         const hasDimensionSignals =
           (dimensionsPayload.catalog.categorical?.length ?? 0) +
@@ -311,16 +321,11 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
           ? dimensionsPayload.catalog
           : fallbackDimensions.date.length
             ? fallbackDimensions
-            : mockDimensions;
+            : EMPTY_DIMENSIONS;
         const insightsPayload = normaliseInsightsPayload(insightsRes);
         const resolvedInsights =
-          insightsPayload.insights.length > 0 ? insightsPayload.insights : fallbackInsights.length ? fallbackInsights : mockInsights;
-        const resolvedDatasetSource =
-          datasetRes?.length
-            ? clampRows(datasetRes)
-            : fallbackDataset.length
-              ? clampRows(fallbackDataset)
-              : clampRows(mockDataset);
+          insightsPayload.insights.length > 0 ? insightsPayload.insights : fallbackInsights.length ? fallbackInsights : [];
+        const resolvedDatasetSource = datasetRes?.length ? clampRows(datasetRes) : clampRows(fallbackDataset);
         const resolvedDataset = normalizeCategoricalValues(resolvedDatasetSource, resolvedDimensions);
 
         setMetrics(resolvedMetrics);
@@ -360,10 +365,10 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         if (!active) return;
         const message = err instanceof Error ? err.message : "تعذر تحميل بيانات الـ BI";
         setError(message);
-        setMetrics(fallbackMetrics.length ? fallbackMetrics : mockMetrics);
-        setDimensions(fallbackDimensions.date.length ? fallbackDimensions : mockDimensions);
-        setInsights(fallbackInsights.length ? fallbackInsights : mockInsights);
-        setDataset(fallbackDataset.length ? clampRows(fallbackDataset) : clampRows(mockDataset));
+        setMetrics(fallbackMetrics.length ? fallbackMetrics : []);
+        setDimensions(fallbackDimensions.date.length ? fallbackDimensions : EMPTY_DIMENSIONS);
+        setInsights(fallbackInsights.length ? fallbackInsights : []);
+        setDataset(clampRows(fallbackDataset));
         setCorrelations(fallbackCorrelations);
         setCatalogMeta({});
         setInsightStats(undefined);
