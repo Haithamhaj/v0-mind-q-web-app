@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import type { CorrelationPair } from "../data";
+import { normalizeLabelText, formatSourcePath } from "../utils/normalize";
 
 type CorrelationInsight = {
   summary?: string;
@@ -104,11 +105,6 @@ const formatMethod = (method?: string): string | undefined => {
   return method.replace(/_/g, " ");
 };
 
-const resolveLabel = (primary?: string | null, fallback?: string | null) => {
-  const label = primary ?? fallback ?? "";
-  return label.replace(/_/g, " ").trim();
-};
-
 export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
   title,
   items,
@@ -141,12 +137,19 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
               const tone = directionTone(item.effect_direction, item.correlation);
               const impactLabel = formatImpact(item);
 
-              const primaryLabel = item.business_label || `${resolveLabel(item.feature_a_label, item.feature_a)} ↔ ${resolveLabel(item.feature_b_label, item.feature_b)}`;
-              const driverDomain =
+              const featureALabel = normalizeLabelText(item.feature_a_label, item.feature_a);
+              const featureBLabel = normalizeLabelText(item.feature_b_label, item.feature_b);
+              const businessLabel = normalizeLabelText(item.business_label);
+              const pairLabel = [featureALabel, featureBLabel].filter(Boolean).join(" ↔ ");
+              const fallbackPair = `${normalizeLabelText(item.feature_a) || item.feature_a || "المؤشر الأول"} ↔ ${normalizeLabelText(item.feature_b) || item.feature_b || "المؤشر الثاني"}`;
+              const primaryLabel = businessLabel || pairLabel || fallbackPair;
+
+              const driverDomainRaw =
                 item.driver_domain ||
                 (item.kpi_feature && item.kpi_feature === item.feature_a ? item.feature_b_domain : item.feature_a_domain) ||
                 item.feature_b_domain ||
                 item.feature_a_domain;
+              const driverDomain = normalizeLabelText(driverDomainRaw);
 
               const directionLabel =
                 item.effect_direction === "improves"
@@ -169,7 +172,7 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                           )}
                           {item.kpi_label && (
                             <Badge variant="secondary" className="bg-primary/10 text-primary">
-                              {item.kpi_label}
+                              {normalizeLabelText(item.kpi_label)}
                             </Badge>
                           )}
                         </div>
@@ -224,7 +227,7 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                       <p className="text-xs text-muted-foreground">{item.impact_summary}</p>
                     )}
                     <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-                      <span className="truncate">{item.source ?? ""}</span>
+                      <span className="truncate" title={item.source ?? undefined}>{formatSourcePath(item.source)}</span>
                       {onExplain ? (
                         <Button
                           type="button"

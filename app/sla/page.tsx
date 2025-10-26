@@ -210,24 +210,37 @@ const SlaPage: React.FC = () => {
   const handleRefresh = () => setRefreshToken((value) => value + 1)
 
   const summary = slaData?.summary
+  const summaryRecommendations = summary?.recommendations
   const kpis = slaData?.kpis ?? []
   const documents = slaData?.documents ?? []
-  const alerts = slaData?.alerts ?? []
-  const attachments = slaData?.attachments ?? []
+  const rawAlerts = slaData?.alerts
+  const alerts = useMemo(() => (Array.isArray(rawAlerts) ? rawAlerts : []), [rawAlerts])
+  const rawAttachments = slaData?.attachments
+  const attachments = useMemo(() => (Array.isArray(rawAttachments) ? rawAttachments : []), [rawAttachments])
   const metadata = slaData?.metadata
+  const metadataNextActions = metadata?.next_actions
 
   const nextActions = useMemo(() => {
     const recommendations: string[] = []
-    (summary?.recommendations ?? []).forEach((item) => {
-      if (item) recommendations.push(item)
-    })
-    (metadata?.next_actions ?? []).forEach((action) => {
-      if (action?.message) recommendations.push(action.message)
-    })
-    const fromAlerts = alerts.filter((alert) => alert.recommendation).map((alert) => alert.recommendation as string)
+    if (Array.isArray(summaryRecommendations)) {
+      summaryRecommendations.forEach((item) => {
+        if (item) recommendations.push(item)
+      })
+    }
+    if (Array.isArray(metadataNextActions)) {
+      metadataNextActions.forEach((action) => {
+        if (action?.message) recommendations.push(action.message)
+      })
+    }
+    const fromAlerts =
+      Array.isArray(alerts) ?
+        alerts
+          .filter((alert) => Boolean(alert?.recommendation))
+          .map((alert) => alert?.recommendation as string) :
+        []
     recommendations.push(...fromAlerts)
-    return Array.from(new Set(recommendations)).slice(0, 5)
-  }, [alerts, metadata?.next_actions, summary?.recommendations])
+    return Array.from(new Set(recommendations.filter(Boolean))).slice(0, 5)
+  }, [alerts, metadataNextActions, summaryRecommendations])
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

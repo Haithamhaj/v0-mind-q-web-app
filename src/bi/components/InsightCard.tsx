@@ -3,6 +3,8 @@
 import * as React from 'react';
 import clsx from 'clsx';
 
+import { normalizeLabelText } from '../utils/normalize';
+
 type Driver = {
   dimension: string;
   value: string;
@@ -46,7 +48,7 @@ export const InsightCard: React.FC<InsightCardProps> = ({
   const deltaText = typeof metricsContext?.delta_text === 'string' ? metricsContext.delta_text : undefined;
   const recommendationsList = (recommendations ?? []).filter(Boolean);
   const nextStepsList = (nextSteps ?? []).filter(Boolean);
-  const displayTags = (tags ?? []).filter(Boolean).slice(0, 3);
+  const displayTags = (tags ?? []).map((tag) => normalizeLabelText(tag)).filter(Boolean).slice(0, 3);
   const primaryNextStep = nextStepsList[0];
 
   return (
@@ -83,15 +85,19 @@ export const InsightCard: React.FC<InsightCardProps> = ({
         <div className='rounded-xl border border-dashed border-border/50 bg-muted/40 p-3'>
           <span className='mb-2 block text-xs font-medium text-muted-foreground'>أبرز المحركات</span>
           <ul className='flex flex-col gap-2 text-sm'>
-            {drivers.map((driver, index) => (
-              <li key={`${driver.dimension}-${index}`} className='flex items-center justify-between gap-3'>
-                <span className='truncate font-medium'>{driver.dimension}</span>
-                <span className='truncate text-sm text-muted-foreground'>{driver.value}</span>
+            {drivers.map((driver, index) => {
+              const dimensionLabel = normalizeLabelText(driver.dimension);
+              const driverValue = normalizeLabelText(driver.value);
+              return (
+                <li key={`${driver.dimension}-${index}`} className='flex items-center justify-between gap-3'>
+                  <span className='truncate font-medium'>{dimensionLabel || driver.dimension}</span>
+                  <span className='truncate text-sm text-muted-foreground'>{driverValue || driver.value}</span>
                 {typeof driver.impact === 'number' && !Number.isNaN(driver.impact) && (
                   <span className='text-xs font-medium text-primary/80'>{(driver.impact * 100).toFixed(1)}%</span>
                 )}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

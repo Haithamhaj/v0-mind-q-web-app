@@ -13,6 +13,7 @@ import {
   InsightStats,
   MetricSpec,
 } from "./types";
+import { canonicalizeDimensionValue } from "../utils/normalize";
 
 type EndpointOverrides = Partial<Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations", string>>;
 
@@ -47,71 +48,6 @@ const clampRows = (rows: BiDatasetRow[] | undefined | null): BiDatasetRow[] => {
     return [];
   }
   return rows.slice(0, MAX_ROWS);
-};
-
-const titleCase = (value: string) =>
-  value
-    .toLowerCase()
-    .split(/\s+/g)
-    .filter((token) => token.length > 0)
-    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
-    .join(" ");
-
-const ARABIC_CHAR_REGEX = /[\u0600-\u06FF]/;
-const ALPHANUMERIC_REGEX = /^[a-z0-9/]+$/i;
-
-const CANONICAL_DIMENSION_ALIASES: Record<string, Record<string, string>> = {
-  payment_method: {
-    cc: "CC",
-    "credit card": "CC",
-    "credit_card": "CC",
-    "credit-card": "CC",
-    "creditcard": "CC",
-    cod: "COD",
-    "cash on delivery": "COD",
-    "cash-on-delivery": "COD",
-    "cash_on_delivery": "COD",
-  },
-  destination: {
-    riyadh: "Riyadh",
-    "riyadh city": "Riyadh",
-    "al riyadh": "Riyadh",
-    "ar riyadh": "Riyadh",
-    الرياض: "الرياض",
-    makkah: "Makkah",
-    "makkah province": "Makkah Province",
-    مكة: "مكة",
-    جدة: "جدة",
-    jeddah: "Jeddah",
-    dammam: "Dammam",
-    الدمام: "الدمام",
-    medina: "Medina",
-    المدينة: "المدينة",
-    madinah: "Medina",
-    "al madinah": "Medina",
-  },
-};
-
-const canonicalizeDimensionValue = (dimensionKey: string, rawValue: string): string => {
-  const lowerValue = rawValue.toLowerCase();
-  const aliasMap = CANONICAL_DIMENSION_ALIASES[dimensionKey];
-  if (aliasMap?.[lowerValue]) {
-    return aliasMap[lowerValue];
-  }
-
-  if (ARABIC_CHAR_REGEX.test(rawValue)) {
-    return rawValue;
-  }
-
-  if (ALPHANUMERIC_REGEX.test(rawValue) && rawValue.length <= 3) {
-    return rawValue.toUpperCase();
-  }
-
-  if (/^\d+$/.test(rawValue)) {
-    return rawValue;
-  }
-
-  return titleCase(rawValue);
 };
 
 const normalizeCategoricalValues = (rows: BiDatasetRow[], dimensions: DimensionsCatalog | undefined | null) => {
