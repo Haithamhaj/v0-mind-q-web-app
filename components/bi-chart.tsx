@@ -1,26 +1,12 @@
 import type { FC } from "react"
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts"
+import type { EChartsCoreOption } from "echarts"
+import { EChartBase } from "@/src/bi/components/layer2/EChartBase"
 
 const DEFAULT_COLORS = ["#2563eb", "#10b981", "#f97316", "#8b5cf6", "#ec4899", "#14b8a6", "#fbbf24", "#0ea5e9"]
 
 interface BiChartProps {
   data: Array<Record<string, unknown>>
-  chartType: string
+  chartType: "line" | "area" | "bar" | "pie" | string
   xKey: string
   valueKey?: string
   height?: number
@@ -35,90 +21,53 @@ export const BiChart: FC<BiChartProps> = ({ data, chartType, xKey, valueKey = "v
     )
   }
 
+  const first = data[0] ?? {}
+  const resolvedXKey = xKey in first ? xKey : Object.keys(first)[0]
   const resolvedValueKey =
-    valueKey in data[0]
+    valueKey in first
       ? valueKey
-      : Object.keys(data[0]).find((key) => {
-          const value = data[0]?.[key]
-          return typeof value === "number"
-        }) ?? valueKey
+      : (Object.keys(first).find((k) => typeof (first as any)[k] === "number") ?? valueKey)
 
-  const resolvedXKey = xKey in data[0] ? xKey : Object.keys(data[0])[0]
-
-  const renderLine = (type: "line" | "area") => (
-    <ResponsiveContainer width="100%" height={height}>
-      {type === "line" ? (
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-          <XAxis dataKey={resolvedXKey} tickLine={false} axisLine={false} />
-          <YAxis tickLine={false} axisLine={false} />
-          <Tooltip />
-          <Line type="monotone" dataKey={resolvedValueKey} stroke="#2563eb" dot={false} strokeWidth={2} />
-        </LineChart>
-      ) : (
-        <AreaChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-          <XAxis dataKey={resolvedXKey} tickLine={false} axisLine={false} />
-          <YAxis tickLine={false} axisLine={false} />
-          <Tooltip />
-          <Area
-            type="monotone"
-            dataKey={resolvedValueKey}
-            stroke="#2563eb"
-            fill="#4f46e5"
-            fillOpacity={0.15}
-            strokeWidth={2}
-          />
-        </AreaChart>
-      )}
-    </ResponsiveContainer>
-  )
-
-  const renderBar = () => (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-        <XAxis dataKey={resolvedXKey} tickLine={false} axisLine={false} />
-        <YAxis tickLine={false} axisLine={false} />
-        <Tooltip />
-        <Bar dataKey={resolvedValueKey} fill="#2563eb" />
-      </BarChart>
-    </ResponsiveContainer>
-  )
-
-  const renderPie = () => (
-    <ResponsiveContainer width="100%" height={height}>
-      <PieChart>
-        <Tooltip />
-        <Pie
-          data={data}
-          dataKey={resolvedValueKey}
-          nameKey={resolvedXKey}
-          cx="50%"
-          cy="50%"
-          outerRadius={Math.min(height / 2.2, 180)}
-        >
-          {data.map((_, index) => (
-            <Cell key={`cell-${index}`} fill={DEFAULT_COLORS[index % DEFAULT_COLORS.length]} />
-          ))}
-        </Pie>
-      </PieChart>
-    </ResponsiveContainer>
-  )
-
-  switch (chartType) {
-    case "line":
-      return renderLine("line")
-    case "area":
-      return renderLine("area")
-    case "bar":
-    case "pareto":
-      return renderBar()
-    case "pie":
-      return renderPie()
-    default:
-      return renderBar()
+  const commonAxes: EChartsCoreOption = {
+    tooltip: { trigger: chartType === "pie" ? "item" : "axis" },
+    grid: { top: 24, right: 16, bottom: 40, left: 40 },
+    xAxis: chartType === "pie" ? undefined : { type: "category", data: data.map((d) => String((d as any)[resolvedXKey])) },
+    yAxis: chartType === "pie" ? undefined : { type: "value" },
+    legend: chartType === "pie" ? { top: 0 } : undefined,
   }
+
+  let option: EChartsCoreOption
+  if (chartType === "pie") {
+    option = {
+      ...commonAxes,
+      series: [
+        {
+          type: "pie",
+          radius: ["40%", "70%"],
+          avoidLabelOverlap: true,
+          data: data.map((d) => ({
+            name: String((d as any)[resolvedXKey]),
+            value: Number((d as any)[resolvedValueKey] ?? 0),
+          })),
+        },
+      ],
+    }
+  } else {
+    const seriesType = chartType === "area" ? "line" : chartType === "pareto" ? "bar" : chartType
+    option = {
+      ...commonAxes,
+      series: [
+        {
+          type: seriesType as any,
+          smooth: seriesType === "line",
+          areaStyle: chartType === "area" ? {} : undefined,
+          data: data.map((d) => Number((d as any)[resolvedValueKey] ?? 0)),
+        },
+      ],
+    }
+  }
+
+  return <EChartBase option={option} height={height} />
 }
 
 export default BiChart

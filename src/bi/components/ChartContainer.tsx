@@ -1,26 +1,10 @@
 "use client";
 
-import React from "react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Funnel,
-  FunnelChart,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  Treemap,
-  XAxis,
-  YAxis,
-} from "recharts";
+import React, { useMemo, useCallback } from "react";
 import clsx from "clsx";
+import type { EChartsCoreOption, SeriesOption } from "echarts";
+import type { EChartsType } from "echarts";
+import { EChartBase } from "../components/layer2/EChartBase";
 
 const DEFAULT_COLORS = ["#1d4ed8", "#9333ea", "#0ea5e9", "#16a34a", "#f97316", "#f43f5e", "#10b981"];
 
@@ -66,7 +50,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
 }) => {
   const primary = ensureArray(y);
   const secondarySeries = ensureArray(secondaryY);
-  
+
   if (loading) {
     return (
       <div className="h-[280px] w-full animate-pulse rounded-2xl border border-border/30 bg-muted/50" aria-hidden="true" />
@@ -77,146 +61,87 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
     return <EmptyState message={emptyMessage} />;
   }
 
-  const handleClick = (payload: any) => {
-    if (onPointClick && payload && payload.payload) {
-      onPointClick(payload.payload);
-    }
-  };
+  const categories = useMemo(() => data.map((d) => String((d as any)[x])), [data, x]);
 
-  const baseMargin = { top: 16, right: 24, bottom: 16, left: 24 };
-
-  const renderChart = (width: number, innerHeight: number) => {
-    const chartHeight = innerHeight > 0 ? innerHeight : height;
-    switch (type) {
-      case "line":
-        return (
-          <LineChart width={width} height={chartHeight} data={data} margin={baseMargin} onClick={handleClick}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-            <XAxis dataKey={x} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            {primary.map((key, index) => (
-              <Line
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={palette[index % palette.length]}
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-            ))}
-          </LineChart>
-        );
-      case "bar":
-        return (
-          <BarChart width={width} height={chartHeight} data={data} margin={baseMargin} onClick={handleClick}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-            <XAxis dataKey={x} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            {primary.map((key, index) => (
-              <Bar key={key} dataKey={key} fill={palette[index % palette.length]} radius={[8, 8, 0, 0]} />
-            ))}
-          </BarChart>
-        );
-      case "area":
-        return (
-          <AreaChart width={width} height={chartHeight} data={data} margin={baseMargin} onClick={handleClick}>
-            <defs>
-              {primary.map((key, index) => (
-                <linearGradient key={key} id={`grad-${key}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={palette[index % palette.length]} stopOpacity={0.8} />
-                  <stop offset="95%" stopColor={palette[index % palette.length]} stopOpacity={0.1} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-            <XAxis dataKey={x} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            {primary.map((key, index) => (
-              <Area
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={palette[index % palette.length]}
-                fill={`url(#grad-${key})`}
-                strokeWidth={2}
-                isAnimationActive={false}
-              />
-            ))}
-          </AreaChart>
-        );
-      case "funnel":
-        return (
-          <FunnelChart width={width} height={chartHeight}>
-            <Tooltip />
-            <Funnel
-              data={data}
-              dataKey={primary[0]}
-              nameKey={x}
-              isAnimationActive={false}
-              stroke="#1f2937"
-              onClick={handleClick}
-            >
-              {data.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
-              ))}
-            </Funnel>
-          </FunnelChart>
-        );
-      case "treemap":
-        return (
-          <Treemap
-            width={width}
-            height={chartHeight}
-            data={data.map((item, index) => ({ ...item, fill: palette[index % palette.length] }))}
-            dataKey={primary[0]}
-            nameKey={x}
-            stroke="#1f2937"
-            animationDuration={0}
-          />
-        );
-      case "combo":
-        return (
-          <ComposedChart width={width} height={chartHeight} data={data} margin={baseMargin} onClick={handleClick}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-            <XAxis dataKey={x} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            {primary.map((key, index) => (
-              <Bar key={key} dataKey={key} fill={palette[index % palette.length]} radius={[6, 6, 0, 0]} />
-            ))}
-            {secondarySeries.map((key, index) => (
-              <Line
-                key={key}
-                type="monotone"
-                dataKey={key}
-                stroke={palette[(primary.length + index) % palette.length]}
-                strokeWidth={2}
-                dot={false}
-              />
-            ))}
-          </ComposedChart>
-        );
-      default:
-        return null;
+  const buildSeries = useCallback((): SeriesOption[] => {
+    if (type === "funnel") {
+      const key = primary[0];
+      return [
+        {
+          type: "funnel",
+          data: data.map((row, idx) => ({
+            name: String((row as any)[x]),
+            value: Number((row as any)[key] ?? 0),
+            __row: row,
+            itemStyle: { color: palette[idx % palette.length] },
+          })),
+        },
+      ];
     }
-  };
+    if (type === "treemap") {
+      const key = primary[0];
+      return [
+        {
+          type: "treemap",
+          roam: false,
+          data: data.map((row, idx) => ({
+            name: String((row as any)[x]),
+            value: Number((row as any)[key] ?? 0),
+            __row: row,
+            itemStyle: { color: palette[idx % palette.length] },
+          })),
+        },
+      ];
+    }
+
+    const primarySeries: SeriesOption[] = primary.map((key, idx) => ({
+      type: type === "area" ? "line" : (type as any),
+      smooth: type === "line" || type === "area",
+      areaStyle: type === "area" ? {} : undefined,
+      name: key,
+      data: data.map((row) => ({ value: Number((row as any)[key] ?? 0), ...row })),
+      itemStyle: { color: palette[idx % palette.length] },
+    }));
+
+    const secondaries: SeriesOption[] = secondarySeries.map((key, idx) => ({
+      type: "line",
+      yAxisIndex: 1,
+      smooth: true,
+      name: key,
+      data: data.map((row) => ({ value: Number((row as any)[key] ?? 0), ...row })),
+      itemStyle: { color: palette[(primary.length + idx) % palette.length] },
+    }));
+
+    return [...primarySeries, ...secondaries];
+  }, [type, primary, secondarySeries, data, x, palette]);
+
+  const option: EChartsCoreOption = useMemo(() => ({
+    tooltip: { trigger: type === "funnel" || type === "treemap" ? "item" : "axis" },
+    grid: { top: 24, right: secondarySeries.length ? 48 : 16, bottom: 40, left: 40 },
+    xAxis: type === "funnel" || type === "treemap" ? undefined : { type: "category", data: categories },
+    yAxis: type === "funnel" || type === "treemap" ? undefined : [
+      { type: "value" },
+      ...(secondarySeries.length ? [{ type: "value" }] : []),
+    ],
+    legend: { top: 0 },
+    series: buildSeries(),
+  }), [type, categories, buildSeries, secondarySeries.length]);
+
+  const handleReady = useCallback((instance: EChartsType) => {
+    if (!onPointClick) return;
+    instance.off("click");
+    instance.on("click", (params: any) => {
+      const payload = params?.data?.__row ?? params?.data;
+      if (payload) onPointClick(payload as any);
+    });
+  }, [onPointClick]);
 
   return (
     <div
       className={clsx("relative flex w-full flex-col gap-2 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm")}
       dir="rtl"
     >
-      <ResponsiveContainer width="100%" height={height}>
-        {(({ width, height: innerHeight }: { width: number; height: number }) => renderChart(width, innerHeight) || <></>) as any}
-      </ResponsiveContainer>
+      <EChartBase option={option} height={height} onReady={handleReady} />
     </div>
   );
 };
