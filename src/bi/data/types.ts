@@ -167,6 +167,49 @@ export type CatalogMetadata = {
   insights?: Record<string, unknown>;
 };
 
+export type Layer2AgentMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type Layer2AgentRequest = {
+  question: string;
+  history?: Layer2AgentMessage[];
+  filters?: Record<string, string[]>;
+  run?: string;
+};
+
+export type Layer2AgentRecommendation = {
+  metricId?: string | null;
+  metricLabel?: string | null;
+  dimension?: string | null;
+  chart?: string | null;
+  filters: Record<string, string[]>;
+  rationale?: string | null;
+  language?: string | null;
+  confidence?: string | null;
+};
+
+export type Layer2AgentResultContext = {
+  metrics?: Array<{ id?: string | null; title?: string | null; unit?: string | null; fmt?: string | null }>;
+  dimensions?: Record<string, string[]>;
+  samples?: Record<string, string[]>;
+  filters?: Record<string, string[]>;
+};
+
+export type Layer2AgentResult = {
+  reply: string;
+  recommendation: Layer2AgentRecommendation;
+  provider: string;
+  model: string;
+  tokensIn: number;
+  tokensOut: number;
+  costEstimate?: number;
+  durationSeconds?: number;
+  usedFallback: boolean;
+  context?: Layer2AgentResultContext;
+};
+
 export type BiDataContextValue = {
   metrics: MetricSpec[];
   dimensions: DimensionsCatalog;
@@ -180,5 +223,6 @@ export type BiDataContextValue = {
   setFilter: (dimension: string, values: string[]) => void;
   insightStats?: InsightStats;
   catalogMeta: CatalogMetadata;
+  runLayer2Assistant: (request: Layer2AgentRequest) => Promise<Layer2AgentResult>;
 };
 

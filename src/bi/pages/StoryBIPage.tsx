@@ -30,7 +30,13 @@ import {
   useBiMetrics,
   useBiCorrelations,
 } from '../data';
-import type { CorrelationCollection, CorrelationPair, Insight, MetricSpec } from '../data';
+import type {
+  CorrelationCollection,
+  CorrelationPair,
+  Insight,
+  Layer2AgentRecommendation,
+  MetricSpec,
+} from '../data';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -611,7 +617,7 @@ const StoryBIContent: React.FC = () => {
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
-  const { setFilter, intelligence } = useBiData();
+  const { setFilter, intelligence, runLayer2Assistant } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
   const activeRun = correlations.run ?? 'run-latest';
@@ -644,6 +650,7 @@ const StoryBIContent: React.FC = () => {
     { role: 'assistant', content: 'مرحباً! اختر بطاقة مؤشر، افتح إحدى الرؤى، أو اطلب تفصيلاً معيناً.' },
   ]);
   const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
   const [firstChartLogged, setFirstChartLogged] = useState(false);
   const [rawMetrics, setRawMetrics] = useState<RawMetricsSummary | null>(null);
   const [rawMetricsLoading, setRawMetricsLoading] = useState<boolean>(true);
@@ -1084,6 +1091,81 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
     }
   };
 
+  const applyAssistantRecommendation = useCallback(
+    (recommendation: Partial<Layer2AgentRecommendation> | undefined) => {
+      if (!recommendation) return;
+
+      if (recommendation.metricId) {
+        setSelectedKpi(recommendation.metricId);
+        setSidePanelOpen(true);
+      }
+
+      if (recommendation.dimension) {
+        const dimensionLower = recommendation.dimension.toLowerCase();
+        const tabMatch =
+          tabs.find((tab) => tab.dimension && tab.dimension.toLowerCase() === dimensionLower) ?? null;
+        if (tabMatch) {
+          setActiveTab(tabMatch.id);
+        }
+      }
+
+      if (recommendation.filters) {
+        Object.entries(recommendation.filters).forEach(([dimension, values]) => {
+          if (Array.isArray(values)) {
+            const cleaned = values
+              .map((value) => (typeof value === 'string' ? value.trim() : String(value).trim()))
+              .filter(Boolean);
+            setFilter(dimension, cleaned);
+          }
+        });
+      }
+    },
+    [tabs, setFilter, setSelectedKpi, setSidePanelOpen, setActiveTab],
+  );
+
+  const buildFallbackAgentResponse = useCallback(
+    (query: string): { message: string; recommendation: Partial<Layer2AgentRecommendation> } => {
+      const lower = query.toLowerCase();
+      const matchingMetric =
+        metrics.find(
+          (item) =>
+            lower.includes(item.id.toLowerCase()) ||
+            (!!item.title && lower.includes(item.title.toLowerCase())),
+        ) ?? null;
+      const matchingDimension =
+        categoricalNames.find((name) => lower.includes(name.toLowerCase())) ?? null;
+
+      let assistantMessage = '';
+
+      if (matchingMetric) {
+        assistantMessage = `تم التركيز على المؤشر ${matchingMetric.title ?? matchingMetric.id}.`;
+      }
+
+      if (matchingDimension) {
+        assistantMessage = `يتم تحليل ${matchingMetric?.title ?? matchingMetric?.id ?? metricId ?? 'المؤشر'} بحسب ${matchingDimension}.`;
+      } else if (matchingMetric && !assistantMessage.includes('يتم تحليل')) {
+        assistantMessage = `يتم تحليل ${matchingMetric.title ?? matchingMetric.id}. جرّب ذكر بُعد للحصول على تفصيل أدق.`;
+      }
+
+      if (!matchingMetric && !matchingDimension) {
+        const metricHints = metrics.map((item) => item.id).slice(0, 5).join('، ') || 'لا يوجد';
+        const dimensionHints = categoricalNames.slice(0, 5).join('، ') || 'لا توجد أبعاد متاحة';
+        assistantMessage = `تعذر العثور على المؤشر أو البُعد المطلوب. جرّب هذه المؤشرات: ${metricHints}. الأبعاد المقترحة: ${dimensionHints}.`;
+      }
+
+      return {
+        message: assistantMessage || 'تم تحديث اللوحة.',
+        recommendation: {
+          metricId: matchingMetric?.id ?? undefined,
+          metricLabel: matchingMetric?.title ?? matchingMetric?.id ?? null,
+          dimension: matchingDimension ?? undefined,
+          filters: {},
+        },
+      };
+    },
+    [metrics, categoricalNames, metricId],
+  );
+
   const applyInsight = (insight: Insight) => {
     if (insight.drivers?.length) {
       insight.drivers.forEach((driver) => {
@@ -1102,48 +1184,37 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
     setActiveTab('narrative');
   };
 
-  const handleChatSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const query = chatInput.trim();
-    if (!query) return;
-
-    const lower = query.toLowerCase();
-    const matchingMetric =
-      metrics.find(
-        (item) =>
-          lower.includes(item.id.toLowerCase()) ||
-          (item.title && lower.includes(item.title.toLowerCase())),
-      ) ?? null;
-    const matchingDimension =
-      categoricalNames.find((name) => lower.includes(name.toLowerCase())) ?? null;
-
-    let assistantMessage = '';
-
-    if (matchingMetric) {
-      setSelectedKpi(matchingMetric.id);
-      assistantMessage = `تم التركيز على المؤشر ${matchingMetric.title ?? matchingMetric.id}.`;
+    if (!query || chatLoading) {
+      return;
     }
 
-    if (matchingDimension) {
-      setActiveTab(tabs.find((tab) => tab.dimension === matchingDimension)?.id ?? activeTab);
-      assistantMessage = `يتم تحليل ${matchingMetric?.title ?? matchingMetric?.id ?? metricId ?? 'المؤشر'} بحسب ${matchingDimension}.`;
-    } else if (matchingMetric && !assistantMessage.includes('يتم تحليل')) {
-      assistantMessage = `يتم تحليل ${matchingMetric.title ?? matchingMetric.id}. جرّب ذكر بُعد للحصول على تفصيل أدق.`;
-    }
-
-    if (!matchingMetric && !matchingDimension) {
-      const metricHints = metrics.map((item) => item.id).slice(0, 5).join('، ') || 'لا يوجد';
-      const dimensionHints = categoricalNames.slice(0, 5).join('، ') || 'لا توجد أبعاد متاحة';
-      assistantMessage = `تعذر العثور على المؤشر أو البُعد المطلوب. جرّب هذه المؤشرات: ${metricHints}. الأبعاد المقترحة: ${dimensionHints}.`;
-    }
-
-    setCanvasNarrative(assistantMessage || 'تم تحديث اللوحة.');
-    setChatHistory((prev) => [
-      ...prev,
-      { role: 'user', content: query },
-      { role: 'assistant', content: assistantMessage || 'تم تحديث اللوحة.' },
-    ]);
+    const userEntry: ChatMessage = { role: 'user', content: query };
+    const historySnapshot = [...chatHistory, userEntry];
+    setChatHistory(historySnapshot);
     setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const response = await runLayer2Assistant({
+        question: query,
+        history: historySnapshot.slice(-6),
+      });
+      const assistantReply = response.reply || 'تم تحديث اللوحة.';
+      setChatHistory((prev) => [...prev, { role: 'assistant', content: assistantReply }]);
+      setCanvasNarrative(assistantReply);
+      applyAssistantRecommendation(response.recommendation);
+    } catch (error) {
+      console.warn('[story-bi] layer2 assistant fallback', error);
+      const fallback = buildFallbackAgentResponse(query);
+      setChatHistory((prev) => [...prev, { role: 'assistant', content: fallback.message }]);
+      setCanvasNarrative(fallback.message);
+      applyAssistantRecommendation(fallback.recommendation);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const handleRawLlmSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1839,6 +1910,13 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               </span>
             </div>
           ))}
+          {chatLoading && (
+            <div className="flex justify-end">
+              <span className="inline-flex max-w-[75%] rounded-2xl px-3 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                المساعد يعمل على التحليل...
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <input
@@ -1849,9 +1927,12 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
           />
           <button
             type="submit"
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+            disabled={chatLoading}
+            className={`rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 ${
+              chatLoading ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
           >
-            Send
+            {chatLoading ? 'جاري التحليل...' : 'Send'}
           </button>
         </div>
       </form>

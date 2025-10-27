@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 
 import { fallbackCorrelations, fallbackDataset, fallbackDimensions, fallbackInsights, fallbackIntelligence, fallbackMetrics } from "./fallback";
 import {
@@ -11,6 +11,10 @@ import {
   DimensionsCatalog,
   Insight,
   InsightStats,
+  Layer2AgentRecommendation,
+  Layer2AgentRequest,
+  Layer2AgentResult,
+  Layer2AgentResultContext,
   MetricSpec,
 } from "./types";
 import { layer3IntelligenceSchema } from "./intelligence";
@@ -31,6 +35,30 @@ const DEFAULT_BASE = process.env.NEXT_PUBLIC_BI_BASE ?? "/api/bi";
 const DEFAULT_RUN = process.env.NEXT_PUBLIC_BI_RUN ?? "run-latest";
 
 const BiDataContext = createContext<BiDataContextValue | undefined>(undefined);
+
+type Layer2AgentResponseRaw = {
+  reply?: string;
+  recommendation?:
+    | {
+        metric_id?: string | null;
+        metric_label?: string | null;
+        dimension?: string | null;
+        chart?: string | null;
+        filters?: Record<string, unknown>;
+        rationale?: string | null;
+        language?: string | null;
+        confidence?: string | null;
+      }
+    | null;
+  provider?: string;
+  model?: string;
+  tokens_in?: number;
+  tokens_out?: number;
+  cost_estimate?: number;
+  duration_s?: number;
+  context?: Layer2AgentResultContext;
+  used_fallback?: boolean;
+};
 
 const EMPTY_DIMENSIONS: DimensionsCatalog = { date: [], numeric: [], categorical: [], bool: [] };
 const EMPTY_CORRELATIONS: CorrelationCollection = {
@@ -92,6 +120,36 @@ const normalizeCategoricalValues = (rows: BiDatasetRow[], dimensions: Dimensions
     }
     return normalized;
   });
+};
+
+const normaliseAgentFilters = (filters: Record<string, unknown> | undefined): Record<string, string[]> => {
+  if (!filters || typeof filters !== "object") {
+    return {};
+  }
+  const normalised: Record<string, string[]> = {};
+  for (const [dimension, raw] of Object.entries(filters)) {
+    if (!dimension) {
+      continue;
+    }
+    if (Array.isArray(raw)) {
+      const values = raw
+        .map((value) => String(value))
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (values.length) {
+        normalised[dimension] = values;
+      }
+      continue;
+    }
+    if (raw === null || raw === undefined) {
+      continue;
+    }
+    const value = String(raw).trim();
+    if (value) {
+      normalised[dimension] = [value];
+    }
+  }
+  return normalised;
 };
 
 const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
@@ -339,6 +397,65 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     mergedEndpoints.intelligence,
   ]);
 
+  const runLayer2Assistant = useCallback(
+    async (request: Layer2AgentRequest): Promise<Layer2AgentResult> => {
+      const payload = {
+        run: request.run ?? DEFAULT_RUN,
+        question: request.question,
+        filters: request.filters ?? filters,
+        history: (request.history ?? []).map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+      };
+
+      let response: Response;
+      try {
+        response = await fetch(`${DEFAULT_BASE}/layer2/assistant`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch (error) {
+        throw new Error(`Layer2 assistant request failed: ${(error as Error).message}`);
+      }
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => response.statusText);
+        throw new Error(`Layer2 assistant request failed (${response.status}): ${detail}`);
+      }
+
+      const data = (await response.json()) as Layer2AgentResponseRaw;
+      const rawRecommendation = data.recommendation ?? {};
+      const recommendation: Layer2AgentRecommendation = {
+        metricId: rawRecommendation.metric_id ?? null,
+        metricLabel: rawRecommendation.metric_label ?? null,
+        dimension: rawRecommendation.dimension ?? null,
+        chart: rawRecommendation.chart ?? null,
+        filters: normaliseAgentFilters(
+          (rawRecommendation.filters ?? undefined) as Record<string, unknown> | undefined,
+        ),
+        rationale: rawRecommendation.rationale ?? null,
+        language: rawRecommendation.language ?? null,
+        confidence: rawRecommendation.confidence ?? null,
+      };
+
+      return {
+        reply: data.reply ?? "",
+        recommendation,
+        provider: data.provider ?? "unknown",
+        model: data.model ?? "unknown",
+        tokensIn: data.tokens_in ?? 0,
+        tokensOut: data.tokens_out ?? 0,
+        costEstimate: data.cost_estimate ?? undefined,
+        durationSeconds: data.duration_s ?? undefined,
+        usedFallback: Boolean(data.used_fallback),
+        context: data.context,
+      };
+    },
+    [filters],
+  );
+
   const value = useMemo<BiDataContextValue>(
     () => ({
       metrics,
@@ -366,8 +483,22 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
           return updated;
         });
       },
+      runLayer2Assistant,
     }),
-    [metrics, dimensions, insights, dataset, correlations, intelligence, loading, error, filters, insightStats, catalogMeta],
+    [
+      metrics,
+      dimensions,
+      insights,
+      dataset,
+      correlations,
+      intelligence,
+      loading,
+      error,
+      filters,
+      insightStats,
+      catalogMeta,
+      runLayer2Assistant,
+    ],
   );
 
   return <BiDataContext.Provider value={value}>{children}</BiDataContext.Provider>;
