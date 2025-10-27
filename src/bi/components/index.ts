@@ -5,3 +5,4 @@ export { FilterBar } from "./FilterBar";
 export { SidePanel } from "./SidePanel";
 export { NarrativeFeed } from "./NarrativeFeed";
 export { CorrelationListCard, correlationPairKey } from "./CorrelationListCard";
+export { Layer2InsightsPanel } from "./layer2";

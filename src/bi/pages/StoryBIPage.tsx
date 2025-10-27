@@ -9,7 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { CorrelationListCard, FilterBar, KpiCard, NarrativeFeed, SidePanel, correlationPairKey } from '../components';
+import {
+  CorrelationListCard,
+  FilterBar,
+  KpiCard,
+  Layer2InsightsPanel,
+  NarrativeFeed,
+  SidePanel,
+  correlationPairKey,
+} from '../components';
 import { ChartContainerChartJS } from '../components/ChartContainerChartJS';
 import {
   BiDataProvider,
@@ -1678,6 +1686,8 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
           فشل توليد الشرح: {correlationError}
         </div>
       ) : null}
+
+      <Layer2InsightsPanel className="mt-6" />
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricSummaries.map((summary) => {
