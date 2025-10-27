@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import { fallbackCorrelations, fallbackDataset, fallbackDimensions, fallbackInsights, fallbackMetrics } from "./fallback";
+import { fallbackCorrelations, fallbackDataset, fallbackDimensions, fallbackInsights, fallbackIntelligence, fallbackMetrics } from "./fallback";
 import {
   BiDataContextValue,
   BiDatasetRow,
@@ -13,9 +13,13 @@ import {
   InsightStats,
   MetricSpec,
 } from "./types";
+import { layer3IntelligenceSchema } from "./intelligence";
+import type { Layer3Intelligence } from "./intelligence";
 import { canonicalizeDimensionValue } from "../utils/normalize";
 
-type EndpointOverrides = Partial<Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations", string>>;
+type EndpointOverrides = Partial<
+  Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations" | "intelligence", string>
+>;
 
 type BiDataProviderProps = {
   children: React.ReactNode;
@@ -96,6 +100,7 @@ const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
   insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(DEFAULT_RUN)}`,
   dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(DEFAULT_RUN)}`,
   correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(DEFAULT_RUN)}&top=50`,
+  intelligence: `${DEFAULT_BASE}/intelligence?run=${encodeURIComponent(DEFAULT_RUN)}`,
 });
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {
@@ -222,6 +227,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const [insights, setInsights] = useState<Insight[]>([]);
   const [dataset, setDataset] = useState<BiDatasetRow[]>([]);
   const [correlations, setCorrelations] = useState<CorrelationCollection>(EMPTY_CORRELATIONS);
+  const [intelligence, setIntelligence] = useState<Layer3Intelligence>(fallbackIntelligence);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | undefined>();
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -234,12 +240,13 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     const load = async () => {
       setLoading(true);
       try {
-        const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes] = await Promise.all([
+        const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes, intelligenceRes] = await Promise.all([
           fetchJson<unknown>(mergedEndpoints.metrics, { metrics: [] }),
           fetchJson<unknown>(mergedEndpoints.dimensions, EMPTY_DIMENSIONS),
           fetchJson<unknown>(mergedEndpoints.insights, { insights: [] }),
           fetchDataset(mergedEndpoints.dataset, []),
           fetchJson<CorrelationCollection>(mergedEndpoints.correlations, EMPTY_CORRELATIONS),
+          fetchJson<unknown>(mergedEndpoints.intelligence, fallbackIntelligence),
         ]);
 
         if (!active) return;
@@ -296,6 +303,8 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
               }
             : fallbackCorrelations;
         setCorrelations(resolvedCorrelations);
+        const parsedIntelligence = layer3IntelligenceSchema.safeParse(intelligenceRes);
+        setIntelligence(parsedIntelligence.success ? parsedIntelligence.data : fallbackIntelligence);
         setError(undefined);
       } catch (err) {
         if (!active) return;
@@ -306,6 +315,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         setInsights(fallbackInsights.length ? fallbackInsights : []);
         setDataset(clampRows(fallbackDataset));
         setCorrelations(fallbackCorrelations);
+        setIntelligence(fallbackIntelligence);
         setCatalogMeta({});
         setInsightStats(undefined);
       } finally {
@@ -320,7 +330,14 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     return () => {
       active = false;
     };
-  }, [mergedEndpoints.metrics, mergedEndpoints.dimensions, mergedEndpoints.insights, mergedEndpoints.dataset, mergedEndpoints.correlations]);
+  }, [
+    mergedEndpoints.metrics,
+    mergedEndpoints.dimensions,
+    mergedEndpoints.insights,
+    mergedEndpoints.dataset,
+    mergedEndpoints.correlations,
+    mergedEndpoints.intelligence,
+  ]);
 
   const value = useMemo<BiDataContextValue>(
     () => ({
@@ -329,6 +346,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       insights,
       dataset,
       correlations,
+      intelligence,
       loading,
       error,
       filters,
@@ -349,7 +367,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         });
       },
     }),
-    [metrics, dimensions, insights, dataset, correlations, loading, error, filters, insightStats, catalogMeta],
+    [metrics, dimensions, insights, dataset, correlations, intelligence, loading, error, filters, insightStats, catalogMeta],
   );
 
   return <BiDataContext.Provider value={value}>{children}</BiDataContext.Provider>;

@@ -14,6 +14,8 @@ import {
   FilterBar,
   KpiCard,
   Layer2InsightsPanel,
+  Layer3IntelligencePanel,
+  KnimeResultsPanel,
   NarrativeFeed,
   SidePanel,
   correlationPairKey,
@@ -609,7 +611,7 @@ const StoryBIContent: React.FC = () => {
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
-  const { setFilter } = useBiData();
+  const { setFilter, intelligence } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
   const activeRun = correlations.run ?? 'run-latest';
@@ -1688,6 +1690,10 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
       ) : null}
 
       <Layer2InsightsPanel className="mt-6" />
+
+      <Layer3IntelligencePanel intelligence={intelligence} className="mt-6" />
+
+      <KnimeResultsPanel data={intelligence.knime} className="lg:w-3/4" />
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricSummaries.map((summary) => {

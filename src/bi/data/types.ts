@@ -1,3 +1,5 @@
+import type { Layer3Intelligence } from "./intelligence";
+
 export type MetricSpec = {
   id: string;
   title?: string;
@@ -171,6 +173,7 @@ export type BiDataContextValue = {
   insights: Insight[];
   dataset: BiDatasetRow[];
   correlations: CorrelationCollection;
+  intelligence: Layer3Intelligence;
   loading: boolean;
   error?: string;
   filters: Record<string, string[]>;

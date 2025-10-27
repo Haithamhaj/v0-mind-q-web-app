@@ -1,4 +1,5 @@
 import type { BiDatasetRow, CorrelationCollection, DimensionsCatalog, Insight, MetricSpec } from "./types";
+export { fallbackIntelligence } from "./intelligence";
 
 export const fallbackMetrics: MetricSpec[] = [
   {
