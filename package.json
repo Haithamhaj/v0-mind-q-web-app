@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "python -m bi.reconcile.run artifacts/p09.parquet artifacts/p10.parquet bi/semantic/metrics.yml",
+    "prebuild": "node scripts/run-prebuild.mjs",
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "perf:check": "node scripts/check-performance-budget.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

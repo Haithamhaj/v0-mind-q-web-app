@@ -327,7 +327,7 @@ export const runLayer1Agent = (request: Layer1AgentRequest): Layer1AgentResponse
     return response;
   }
 
-  const wantsClear = CLEAR_FILTER_KEYWORDS.some((keyword) => lowercase.includes(normalize(keyword)));
+const wantsClear = CLEAR_FILTER_KEYWORDS.some((keyword) => lowercase.includes(normalize(keyword)));
   if (wantsClear) {
     if (!Object.keys(filters).length) {
       response.reply = "لا توجد فلاتر فعالة حالياً. يمكنك ضبط فلتر بقول: \"فلتر الوجهة على جدة\".";
@@ -337,14 +337,9 @@ export const runLayer1Agent = (request: Layer1AgentRequest): Layer1AgentResponse
       response.filtersToClear = [matchedColumn.key];
       response.reply = `تمت إزالة الفلاتر عن الحقل ${buildBilingualLabel(matchedColumn.key)}.`;
     } else {
-      response.filtersToClear = [RESET_ALL_KEYWORDS.some((keyword) => lowercase.includes(normalize(keyword))) ? undefined : undefined]
-        .filter(Boolean) as string[];
-      if (!response.filtersToClear.length) {
-        response.filtersToClear = Object.keys(filters);
-        response.reply = "تمت إزالة جميع الفلاتر الحالية.";
-      } else {
-        response.reply = `تمت إزالة الفلاتر المحددة.`;
-      }
+      const clearAll = RESET_ALL_KEYWORDS.some((keyword) => lowercase.includes(normalize(keyword)));
+      response.filtersToClear = clearAll ? Object.keys(filters) : Object.keys(filters);
+      response.reply = clearAll ? "تمت إزالة جميع الفلاتر الحالية." : "تمت إزالة الفلاتر المحددة.";
     }
     return response;
   }
@@ -380,23 +375,19 @@ export const runLayer1Agent = (request: Layer1AgentRequest): Layer1AgentResponse
         ? request.dimensions.date[0].name
         : dimensionKey;
 
-    const yKeys =
-      chartType === "pie" || chartType === "funnel"
-        ? [metricKey ?? numericColumns[0]?.key ?? "cod_amount"]
-        : [metricKey ?? numericColumns[0]?.key ?? "cod_amount"];
-
     response.chartRecommendation = {
       type: chartType,
       metricKey: metricKey ?? undefined,
       dimensionKey,
       x: xAxisKey,
-      y: yKeys,
+      y: ["value"],
+      secondaryY: chartType === "combo" ? ["share"] : undefined,
       reason: columnForChart
         ? `اعتمدت على الحقل ${buildBilingualLabel(columnForChart.key)} لأنه الأكثر ارتباطاً بالسؤال.`
-        : `استخدمت أول حقل متاح ${buildBilingualLabel(dimensionKey)} مع المقياس ${buildBilingualLabel(yKeys[0])}.`,
+        : `استخدمت أول حقل متاح ${buildBilingualLabel(dimensionKey)} مع المقياس ${metricKey ? buildBilingualLabel(metricKey) : "قيمة"} .`,
     };
 
-    response.reply = `جاهز لعرض مخطط ${chartType === "bar" ? "أعمدة" : chartType === "line" ? "خطوط" : chartType} باستخدام ${buildBilingualLabel(yKeys[0])} مقابل ${buildBilingualLabel(xAxisKey)}.${columnForChart ? ` (الحقل المستهدف: ${buildBilingualLabel(columnForChart.key)})` : ""}`;
+    response.reply = `جاهز لعرض مخطط ${chartType === "bar" ? "أعمدة" : chartType === "line" ? "خطوط" : chartType} باستخدام ${metricKey ? buildBilingualLabel(metricKey) : "قيمة"} مقابل ${buildBilingualLabel(xAxisKey)}.${columnForChart ? ` (الحقل المستهدف: ${buildBilingualLabel(columnForChart.key)})` : ""}`;
     return response;
   }
 

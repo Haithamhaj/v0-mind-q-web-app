@@ -2,7 +2,7 @@
 
 import * as echarts from "echarts";
 
-import { mindQTokens } from "@/bi/theme/tokens";
+import { mindQTokens } from "../../theme/tokens";
 
 export type Layer1ThemeMode = "light" | "dark";
 

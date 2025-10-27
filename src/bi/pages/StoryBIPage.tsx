@@ -20,6 +20,10 @@ import {
   correlationPairKey,
 } from '../components';
 import { Layer1Chart, Layer1KpiCard } from '../charts/layer1';
+import type { Layer1ChartProps } from '../charts/layer1';
+import { ChartExport } from '../charts/shared/ChartExport';
+import { buildBilingualLabel, resolveFieldLabel } from '../charts/shared/labels';
+import { runLayer1Agent } from '../assistants';
 import {
   BiDataProvider,
   useBiData,
@@ -32,15 +36,27 @@ import {
 import type {
   CorrelationCollection,
   CorrelationPair,
+  DimensionsCatalog,
   Insight,
   Layer2AgentRecommendation,
   MetricSpec,
 } from '../data';
+import { featureFlags } from '../../../config/features';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
 };
+
+type Layer1ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  explanation?: string[];
+};
+
+type Layer1AssistantChartState = (Layer1ChartProps & { title?: string; subtitle?: string; reason?: string }) | null;
+
+type Layer1AgentChartRecommendation = NonNullable<ReturnType<typeof runLayer1Agent>["chartRecommendation"]>;
 
 type TabConfig = {
   id: string;
@@ -453,6 +469,8 @@ const parseFormula = (formula?: string): { aggregator: string; column: string | 
 const aggregateValues = (values: number[], aggregator: string) => {
   if (!values.length) return 0;
   switch (aggregator) {
+    case 'COUNT':
+      return values.length;
     case 'AVG':
     case 'MEAN':
       return values.reduce((acc, val) => acc + val, 0) / values.length;
@@ -473,29 +491,29 @@ const computeMetricSummary = (rows: Record<string, unknown>[], metric: MetricSpe
 
   const joinKeys = Array.isArray(metric.join_keys) ? metric.join_keys : [];
   const seen = new Set<string>();
-  const numericSeries = rows
-    .map((row) => {
-      const value = Number(row[column]);
-      if (!Number.isFinite(value)) {
-        return null;
-      }
-      const timestamp = timeColumn ? (row[timeColumn] !== undefined ? String(row[timeColumn]) : undefined) : undefined;
-      const dedupKeyParts = joinKeys
-        .map((key) => (row[key] !== undefined && row[key] !== null ? String(row[key]) : ""))
-        .filter(Boolean);
-      if (timestamp) {
-        dedupKeyParts.push(timestamp);
-      }
-      const dedupKey = dedupKeyParts.length ? dedupKeyParts.join("||") : undefined;
-      if (dedupKey && seen.has(dedupKey)) {
-        return null;
-      }
-      if (dedupKey) {
-        seen.add(dedupKey);
-      }
-      return { value, timestamp };
-    })
-    .filter((entry): entry is { value: number; timestamp?: string } => entry !== null);
+  const numericSeries: Array<{ value: number; timestamp?: string }> = [];
+
+  rows.forEach((row) => {
+    const value = Number(row[column]);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    const timestamp = timeColumn ? (row[timeColumn] !== undefined ? String(row[timeColumn]) : undefined) : undefined;
+    const dedupKeyParts = joinKeys
+      .map((key) => (row[key] !== undefined && row[key] !== null ? String(row[key]) : ""))
+      .filter(Boolean);
+    if (timestamp) {
+      dedupKeyParts.push(timestamp);
+    }
+    const dedupKey = dedupKeyParts.length ? dedupKeyParts.join("||") : undefined;
+    if (dedupKey && seen.has(dedupKey)) {
+      return;
+    }
+    if (dedupKey) {
+      seen.add(dedupKey);
+    }
+    numericSeries.push({ value, timestamp });
+  });
 
   const value = aggregateValues(
     numericSeries.map((entry) => entry.value),
@@ -526,10 +544,19 @@ const buildDimensionSeries = (
   const groups = new Map<string, number[]>();
   rows.forEach((row) => {
     const dimValue = row[dimension];
-    const raw = Number(row[column]);
-    if (!Number.isFinite(raw) || dimValue === undefined || dimValue === null) return;
+    if (dimValue === undefined || dimValue === null) return;
+    let numericValue: number | null = null;
+    if (aggregator === 'COUNT') {
+      numericValue = 1;
+    } else {
+      const raw = Number(row[column]);
+      if (Number.isFinite(raw)) {
+        numericValue = raw;
+      }
+    }
+    if (numericValue === null) return;
     const key = String(dimValue);
-    groups.set(key, [...(groups.get(key) ?? []), raw]);
+    groups.set(key, [...(groups.get(key) ?? []), numericValue]);
   });
   const entries = Array.from(groups.entries()).map(([key, values]) => ({
     label: key,
@@ -549,10 +576,19 @@ const buildTimeSeries = (rows: Record<string, unknown>[], column: string, timeCo
   const groups = new Map<string, number[]>();
   rows.forEach((row) => {
     const time = row[timeColumn];
-    const raw = Number(row[column]);
-    if (!Number.isFinite(raw) || time === undefined || time === null) return;
+    if (time === undefined || time === null) return;
+    let numericValue: number | null = null;
+    if (aggregator === 'COUNT') {
+      numericValue = 1;
+    } else {
+      const raw = Number(row[column]);
+      if (Number.isFinite(raw)) {
+        numericValue = raw;
+      }
+    }
+    if (numericValue === null) return;
     const key = String(time);
-    groups.set(key, [...(groups.get(key) ?? []), raw]);
+    groups.set(key, [...(groups.get(key) ?? []), numericValue]);
   });
   return Array.from(groups.entries())
     .map(([key, values]) => ({
@@ -560,6 +596,89 @@ const buildTimeSeries = (rows: Record<string, unknown>[], column: string, timeCo
       value: aggregateValues(values, aggregator),
     }))
     .sort((a, b) => String(a[timeColumn]).localeCompare(String(b[timeColumn])));
+};
+
+const buildLayer1AssistantChartState = (
+  recommendation: NonNullable<ReturnType<typeof runLayer1Agent>["chartRecommendation"]>,
+  rows: Record<string, unknown>[],
+  metrics: MetricSpec[],
+  dimensions: DimensionsCatalog,
+): Layer1AssistantChartState => {
+  if (!rows.length) {
+    return null;
+  }
+  const metric = recommendation.metricKey
+    ? metrics.find((item) => item.id === recommendation.metricKey)
+    : metrics[0];
+  const { aggregator, column } = parseFormula(metric?.formula);
+  const valueColumn = column ?? recommendation.metricKey ?? metric?.id ?? "cod_amount";
+  const dimensionKey = recommendation.dimensionKey ?? recommendation.x;
+  const effectiveAggregator = aggregator || "SUM";
+
+  if (recommendation.type === "line" || recommendation.type === "area") {
+    const timeKey = recommendation.x;
+    const series = buildTimeSeries(rows, valueColumn, timeKey, effectiveAggregator);
+    if (!series.length) {
+      return null;
+    }
+    const limited = series.slice(0, 50);
+    const timeLabel = resolveFieldLabel(timeKey);
+    const metricLabel = metric ? resolveFieldLabel(metric.id) : { en: "Value", ar: "القيمة" };
+    const exportRows = limited.map((entry) => ({ [timeKey]: entry[timeKey], value: entry.value }));
+    return {
+      type: recommendation.type,
+      data: exportRows,
+      x: timeKey,
+      y: ["value"],
+      height: 320,
+      emptyMessage: "لا توجد بيانات كافية لعرض الاتجاه.",
+      subtitle: buildBilingualLabel(timeKey),
+      reason: recommendation.reason,
+      title: metric ? buildBilingualLabel(metric.id) : undefined,
+      exportConfig: {
+        fileName: `layer1-${recommendation.type}-${timeKey}`,
+        columns: [
+          { key: timeKey, label: timeLabel.en, labelAr: timeLabel.ar },
+          { key: "value", label: metricLabel.en, labelAr: metricLabel.ar },
+        ],
+        rows: exportRows,
+      },
+    };
+  }
+
+  const series = buildDimensionSeries(rows, valueColumn, dimensionKey, effectiveAggregator);
+  if (!series.length) {
+    return null;
+  }
+  const limited = series.slice(0, 12);
+  const data = limited.map((entry) => ({
+    [dimensionKey]: entry.dimension,
+    value: entry.value,
+    share: Number((entry.share * 100).toFixed(2)),
+  }));
+  const dimensionLabel = resolveFieldLabel(dimensionKey);
+  const metricLabel = metric ? resolveFieldLabel(metric.id) : { en: "Value", ar: "القيمة" };
+  return {
+    type: recommendation.type,
+    data,
+    x: dimensionKey,
+    y: ["value"],
+    secondaryY: recommendation.type === "combo" ? ["share"] : undefined,
+    height: 320,
+    emptyMessage: "لا توجد بيانات كافية لعرض المخطط.",
+    title: metric ? buildBilingualLabel(metric.id) : undefined,
+    subtitle: buildBilingualLabel(dimensionKey),
+    reason: recommendation.reason,
+    exportConfig: {
+      fileName: `layer1-${recommendation.type}-${dimensionKey}`,
+      columns: [
+        { key: dimensionKey, label: dimensionLabel.en, labelAr: dimensionLabel.ar },
+        { key: "value", label: metricLabel.en, labelAr: metricLabel.ar },
+        { key: "share", label: "Share %", labelAr: "النسبة %" },
+      ],
+      rows: data,
+    },
+  };
 };
 
 const buildTabs = (metrics: MetricSpec[], categorical: string[]): TabConfig[] => {
@@ -612,14 +731,37 @@ const formatCurrency = (value?: number | null) => {
 };
 
 const StoryBIContent: React.FC = () => {
+  const { biLayer2, biLayer3, knimeBridge } = featureFlags;
   const { translate, language } = useLanguage();
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
-  const { setFilter, intelligence, runLayer2Assistant } = useBiData();
+  const { setFilter, filters, intelligence, runLayer2Assistant } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
   const activeRun = correlations.run ?? 'run-latest';
+  const datasetExportConfig = useMemo(() => {
+    if (!dataset.length) {
+      return null;
+    }
+    const keys = Array.from(new Set(dataset.flatMap((row) => Object.keys(row))));
+    if (!keys.length) {
+      return null;
+    }
+    const columns = keys.map((key) => {
+      const { en, ar } = resolveFieldLabel(key);
+      return { key, label: en, labelAr: ar };
+    });
+    return {
+      fileName: `layer1-dataset-${activeRun}`,
+      columns,
+      rows: dataset,
+    };
+  }, [dataset, activeRun]);
+  const activeFilters = useMemo(
+    () => Object.entries(filters).filter(([, values]) => values.length > 0),
+    [filters],
+  );
 
   const insightTypeLabel = (type: string) => {
     switch (type) {
@@ -660,6 +802,21 @@ const StoryBIContent: React.FC = () => {
   const [rawLlmInput, setRawLlmInput] = useState('');
   const [rawLlmLoading, setRawLlmLoading] = useState(false);
   const [rawLlmError, setRawLlmError] = useState<string | null>(null);
+  const [layer1AssistantMessages, setLayer1AssistantMessages] = useState<Layer1ChatMessage[]>([
+    { role: 'assistant', content: 'مرحباً! أستطيع مساعدتك في شرح الحقول أو ضبط الفلاتر. جرّب: "فلتر الوجهة على جدة".' },
+  ]);
+  const [layer1AssistantInput, setLayer1AssistantInput] = useState('');
+  const [layer1AssistantLoading, setLayer1AssistantLoading] = useState(false);
+  const [layer1AssistantChart, setLayer1AssistantChart] = useState<Layer1AssistantChartState>(null);
+  const [layer1PendingRecommendation, setLayer1PendingRecommendation] = useState<Layer1AgentChartRecommendation | null>(null);
+  useEffect(() => {
+    if (!layer1PendingRecommendation) {
+      setLayer1AssistantChart(null);
+      return;
+    }
+    const chartState = buildLayer1AssistantChartState(layer1PendingRecommendation, dataset, metrics, dimensions);
+    setLayer1AssistantChart(chartState);
+  }, [layer1PendingRecommendation, dataset, metrics, dimensions]);
   const breakdowns = useMemo(() => rawMetrics?.breakdowns ?? [], [rawMetrics]);
   const [correlationFilterState, setCorrelationFilterState] = useState<CorrelationFilterState>(DEFAULT_CORRELATION_FILTER);
   const [correlationExplanations, setCorrelationExplanations] = useState<Record<string, CorrelationExplanationPayload>>({});
@@ -1182,6 +1339,69 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
     }
     setActiveTab('narrative');
   };
+
+  const handleLayer1AssistantSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const question = layer1AssistantInput.trim();
+      if (!question) {
+        return;
+      }
+      setLayer1AssistantMessages((prev) => [...prev, { role: 'user', content: question }]);
+      setLayer1AssistantInput('');
+      setLayer1AssistantLoading(true);
+
+      try {
+        const response = runLayer1Agent({
+          question,
+          dataset,
+          filters,
+          metrics,
+          dimensions,
+        });
+
+        if (response.filtersToClear?.length) {
+          response.filtersToClear.forEach((dimension) => {
+            setFilter(dimension, []);
+          });
+        }
+        if (response.filtersToSet) {
+          Object.entries(response.filtersToSet).forEach(([dimension, values]) => {
+            setFilter(dimension, values);
+          });
+        }
+
+        if (response.chartRecommendation) {
+          setLayer1PendingRecommendation(response.chartRecommendation);
+          setCanvasNarrative(response.chartRecommendation.reason ?? response.reply);
+        } else {
+          setLayer1PendingRecommendation(null);
+          setLayer1AssistantChart(null);
+          setCanvasNarrative(response.reply);
+        }
+
+        const explanationLines = response.columnExplanation?.lines ?? [];
+        setLayer1AssistantMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: response.reply,
+            explanation: explanationLines.length ? explanationLines : undefined,
+          },
+        ]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'تعذر معالجة الطلب. حاول مرة أخرى.';
+        setLayer1AssistantMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `حدث خطأ: ${message}` },
+        ]);
+        setLayer1PendingRecommendation(null);
+      } finally {
+        setLayer1AssistantLoading(false);
+      }
+    },
+    [layer1AssistantInput, dataset, filters, metrics, dimensions, setFilter],
+  );
 
   const handleChatSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1759,11 +1979,11 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
         </div>
       ) : null}
 
-      <Layer2InsightsPanel className="mt-6" />
+  {biLayer2 ? <Layer2InsightsPanel className="mt-6" /> : null}
 
-      <Layer3IntelligencePanel intelligence={intelligence} className="mt-6" />
+  {biLayer3 ? <Layer3IntelligencePanel intelligence={intelligence} className="mt-6" /> : null}
 
-      <KnimeResultsPanel data={intelligence.knime} className="lg:w-3/4" />
+  {knimeBridge && intelligence?.knime ? <KnimeResultsPanel data={intelligence.knime} className="lg:w-3/4" /> : null}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricSummaries.map((summary) => {
