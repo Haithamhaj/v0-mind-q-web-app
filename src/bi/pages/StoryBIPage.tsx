@@ -12,7 +12,6 @@ import { Switch } from '@/components/ui/switch';
 import {
   CorrelationListCard,
   FilterBar,
-  KpiCard,
   Layer2InsightsPanel,
   Layer3IntelligencePanel,
   KnimeResultsPanel,
@@ -20,7 +19,7 @@ import {
   SidePanel,
   correlationPairKey,
 } from '../components';
-import { ChartContainerChartJS } from '../components/ChartContainerChartJS';
+import { Layer1Chart, Layer1KpiCard } from '../charts/layer1';
 import {
   BiDataProvider,
   useBiData,
@@ -1533,7 +1532,7 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               {dailyTrendChart ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">الطلبات حسب اليوم</h3>
-                  <ChartContainerChartJS
+                  <Layer1Chart
                     key={`daily-trend-${dailyTrendChart.data?.length || 0}`}
                     type={dailyTrendChart.type}
                     data={dailyTrendChart.data}
@@ -1548,7 +1547,7 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               {weekdayTrendChart ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">التوزيع حسب أيام الأسبوع</h3>
-                  <ChartContainerChartJS
+                  <Layer1Chart
                     type={weekdayTrendChart.type}
                     data={weekdayTrendChart.data}
                     x={weekdayTrendChart.x}
@@ -1562,7 +1561,7 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               {hourTrendChart ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">الطلبات حسب الساعة</h3>
-                  <ChartContainerChartJS
+                  <Layer1Chart
                     type={hourTrendChart.type}
                     data={hourTrendChart.data}
                     x={hourTrendChart.x}
@@ -1597,7 +1596,7 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {resolvedBreakdownChart ? (
-                        <ChartContainerChartJS
+                        <Layer1Chart
                           type={resolvedBreakdownChart.type}
                           data={resolvedBreakdownChart.data}
                           x={resolvedBreakdownChart.x}
@@ -1776,7 +1775,7 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               ? ((latest - previous) / Math.max(Math.abs(previous), 1)) * 100
               : null;
           return (
-            <KpiCard
+            <Layer1KpiCard
               key={summary.metric.id}
               title={summary.metric.title ?? summary.metric.id}
               value={summary.value}
@@ -1862,7 +1861,7 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
             <>
               <p className="text-sm text-muted-foreground text-start">{canvasNarrative}</p>
               {activeConfig?.chartType && column ? (
-                <ChartContainerChartJS
+                <Layer1Chart
                   type={activeConfig.chartType}
                   data={canvasData}
                   x={canvasXAxis}
