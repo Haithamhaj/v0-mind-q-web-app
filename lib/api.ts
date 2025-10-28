@@ -39,7 +39,7 @@ export interface PipelineResponse {
   phases: Array<Record<string, unknown>>
 }
 
-export type PipelinePhaseStatus = "pending" | "running" | "completed" | "skipped"
+export type PipelinePhaseStatus = "pending" | "running" | "completed" | "skipped" | "deferred"
 
 export interface PipelineProgressPhase {
   id: string
@@ -48,8 +48,22 @@ export interface PipelineProgressPhase {
   index: number
 }
 
+export interface AsyncJobInfo {
+  id: string
+  phase: string
+  status: "waiting_for_user" | "processing" | "completed" | "failed"
+  mode: string
+  queued_at: string
+  resume_endpoint: string
+  artifacts_root: string
+  request: Record<string, unknown>
+  instructions: string[]
+  manifest: string
+}
+
 export interface PipelineProgress {
-  status: "running" | "completed" | "failed"
+  run_id?: string
+  status: "running" | "completed" | "failed" | "completed_with_deferred"
   current_phase?: string | null
   completed_count: number
   total_count: number
@@ -58,6 +72,8 @@ export interface PipelineProgress {
   updated_at: string
   skipped?: string[]
   error?: string
+  deferred?: string[]
+  async_jobs?: Record<string, AsyncJobInfo>
 }
 
 export interface BiMartPreview {
@@ -350,6 +366,10 @@ class MindQAPI {
 
   async runLLMSummary(runId: string, request: PhaseRequest): Promise<Record<string, unknown>> {
     return this.post(`/v1/runs/${runId}/phases/07/llm-summary`, request)
+  }
+
+  async runKnimeBridge(runId: string, request: PhaseRequest = { use_defaults: true }): Promise<Record<string, unknown>> {
+    return this.post(`/v1/runs/${runId}/phases/07/knime-bridge`, request)
   }
 
   async runFullPipeline(

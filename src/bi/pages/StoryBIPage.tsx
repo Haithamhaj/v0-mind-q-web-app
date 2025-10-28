@@ -19,6 +19,7 @@ import {
   NarrativeFeed,
   SidePanel,
   correlationPairKey,
+  ChartExplainButton,
 } from '../components';
 import { Layer1Chart, Layer1KpiCard } from '../charts/layer1';
 import type { Layer1ChartProps } from '../charts/layer1';
@@ -802,6 +803,9 @@ const StoryBIContent: React.FC = () => {
   const [correlationExplanations, setCorrelationExplanations] = useState<Record<string, BiCorrelationExplanation | undefined>>({});
   const [correlationExplainingKey, setCorrelationExplainingKey] = useState<string | null>(null);
   const [correlationError, setCorrelationError] = useState<string | null>(null);
+  // Chart explanation state
+  const [chartExplanations, setChartExplanations] = useState<Record<string, string>>({});
+  const [chartExplainingKey, setChartExplainingKey] = useState<string | null>(null);
 
   const trends = rawMetrics?.trends;
   const breakdowns = rawMetrics?.breakdowns ?? [];
@@ -1031,6 +1035,44 @@ const StoryBIContent: React.FC = () => {
       }
     },
     [correlations.run, language, rawMetrics?.run, translate],
+  );
+
+  // Handle chart explanation via LLM
+  const handleExplainChart = useCallback(
+    async (chartKey: string, context: { title: string; type?: string; summary?: string }): Promise<string> => {
+      setChartExplainingKey(chartKey);
+      try {
+        // Call chart explanation endpoint
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:9000"}/api/bi/charts/explain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chart_title: context.title,
+            chart_type: context.type || "line",
+            data_summary: context.summary || "",
+            language: language === "ar" ? "ar" : "en",
+            use_llm: true,
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to get chart explanation");
+        }
+        
+        const data = await response.json();
+        const explanation = data.explanation || translate("لا يوجد شرح متاح.");
+        setChartExplanations((prev) => ({ ...prev, [chartKey]: explanation }));
+        return explanation;
+      } catch (error) {
+        console.error("[story-bi] failed to explain chart", error);
+        const errorMsg = translate("فشل في الحصول على الشرح.");
+        setChartExplanations((prev) => ({ ...prev, [chartKey]: errorMsg }));
+        return errorMsg;
+      } finally {
+        setChartExplainingKey(null);
+      }
+    },
+    [language, translate],
   );
 
   const biSummary = useMemo(() => {
@@ -1703,37 +1745,6 @@ const StoryBIContent: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-
-            <CorrelationListCard
-              title={translate("روابط عددية (RAW)")}
-              items={rawNumericHighlights}
-              limit={4}
-              emptyMessage={translate("لا توجد ارتباطات عددية في البيانات الخام.")}
-            />
-            <CorrelationListCard
-              title={translate("روابط زمنية (RAW)")}
-              items={rawDatetimeHighlights}
-              limit={4}
-              emptyMessage={translate("لا توجد ارتباطات زمنية في البيانات الخام.")}
-            />
-            <CorrelationListCard
-              title={translate("روابط أعمال (RAW)")}
-              items={rawBusinessNumeric}
-              limit={4}
-              emptyMessage={translate("لا توجد روابط أعمال في البيانات الخام.")}
-            />
-            <CorrelationListCard
-              title={translate("أثر الفئات على المقاييس (RAW)")}
-              items={rawBusinessNumericCategorical}
-              limit={4}
-              emptyMessage={translate("لا توجد روابط فئوية في البيانات الخام.")}
-            />
-            <CorrelationListCard
-              title={translate("روابط الفئات (RAW)")}
-              items={rawBusinessCategorical}
-              limit={4}
-              emptyMessage={translate("لا توجد روابط فئات في البيانات الخام.")}
-            />
           </div>
 
           {hasAnyTrendChart ? (
@@ -1751,6 +1762,14 @@ const StoryBIContent: React.FC = () => {
                     emptyMessage={translate("لا توجد بيانات يومية.")}
                     debugId="daily-trend"
                   />
+                  <ChartExplainButton
+                    chartTitle={translate("الطلبات حسب اليوم")}
+                    chartType={dailyTrendChart.type}
+                    dataSummary={`Daily trend with ${dailyTrendChart.data?.length || 0} data points`}
+                    onExplain={(ctx) => handleExplainChart("daily-trend", ctx)}
+                    explanation={chartExplanations["daily-trend"]}
+                    isLoading={chartExplainingKey === "daily-trend"}
+                  />
                 </div>
               ) : null}
               {weekdayTrendChart ? (
@@ -1765,6 +1784,14 @@ const StoryBIContent: React.FC = () => {
                     emptyMessage={translate("لا توجد بيانات أسبوعية.")}
                     debugId="weekday-trend"
                   />
+                  <ChartExplainButton
+                    chartTitle={translate("التوزيع حسب أيام الأسبوع")}
+                    chartType={weekdayTrendChart.type}
+                    dataSummary={`Weekday distribution with ${weekdayTrendChart.data?.length || 0} data points`}
+                    onExplain={(ctx) => handleExplainChart("weekday-trend", ctx)}
+                    explanation={chartExplanations["weekday-trend"]}
+                    isLoading={chartExplainingKey === "weekday-trend"}
+                  />
                 </div>
               ) : null}
               {hourTrendChart ? (
@@ -1778,6 +1805,14 @@ const StoryBIContent: React.FC = () => {
                     secondaryY={hourTrendChart.secondary_y}
                     emptyMessage={translate("لا توجد بيانات زمنية.")}
                     debugId="hour-trend"
+                  />
+                  <ChartExplainButton
+                    chartTitle={translate("الطلبات حسب الساعة")}
+                    chartType={hourTrendChart.type}
+                    dataSummary={`Hourly trend with ${hourTrendChart.data?.length || 0} data points`}
+                    onExplain={(ctx) => handleExplainChart("hour-trend", ctx)}
+                    explanation={chartExplanations["hour-trend"]}
+                    isLoading={chartExplainingKey === "hour-trend"}
                   />
                 </div>
               ) : null}
@@ -1807,15 +1842,25 @@ const StoryBIContent: React.FC = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {resolvedBreakdownChart ? (
-                        <Layer1Chart
-                          type={resolvedBreakdownChart.type}
-                          data={resolvedBreakdownChart.data}
-                          x={resolvedBreakdownChart.x}
-                          y={resolvedBreakdownChart.y}
-                          secondaryY={resolvedBreakdownChart.secondary_y}
-                          emptyMessage={translate("لا توجد بيانات كافية للرسم.")}
-                          debugId={`breakdown-${breakdownKey}`}
-                        />
+                        <>
+                          <Layer1Chart
+                            type={resolvedBreakdownChart.type}
+                            data={resolvedBreakdownChart.data}
+                            x={resolvedBreakdownChart.x}
+                            y={resolvedBreakdownChart.y}
+                            secondaryY={resolvedBreakdownChart.secondary_y}
+                            emptyMessage={translate("لا توجد بيانات كافية للرسم.")}
+                            debugId={`breakdown-${breakdownKey}`}
+                          />
+                          <ChartExplainButton
+                            chartTitle={breakdown.label}
+                            chartType={resolvedBreakdownChart.type}
+                            dataSummary={`Breakdown by ${breakdown.dimension || breakdown.label} with ${resolvedBreakdownChart.data?.length || 0} categories`}
+                            onExplain={(ctx) => handleExplainChart(`breakdown-${breakdownKey}`, ctx)}
+                            explanation={chartExplanations[`breakdown-${breakdownKey}`]}
+                            isLoading={chartExplainingKey === `breakdown-${breakdownKey}`}
+                          />
+                        </>
                       ) : (
                         <div className="rounded-xl border border-dashed border-border/40 p-6 text-sm text-muted-foreground">
                           {translate("لا توجد بيانات كافية للرسم.")}
@@ -2015,54 +2060,6 @@ const StoryBIContent: React.FC = () => {
         ))}
       </nav>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <CorrelationListCard
-          title="أبرز الارتباطات العددية"
-          items={numericHighlights}
-          limit={6}
-          emptyMessage="لا توجد ارتباطات عددية متاحة."
-          onExplain={handleExplainCorrelation}
-          explanations={correlationExplanations}
-          explainingKey={correlationExplainingKey}
-        />
-        <CorrelationListCard
-          title="أبرز الارتباطات الزمنية"
-          items={datetimeHighlights}
-          limit={6}
-          emptyMessage="لا توجد ارتباطات زمنية متاحة."
-          onExplain={handleExplainCorrelation}
-          explanations={correlationExplanations}
-          explainingKey={correlationExplainingKey}
-        />
-        <CorrelationListCard
-          title="روابط أعمال"
-          items={businessNumericHighlights}
-          limit={6}
-          emptyMessage="لا توجد روابط أعمال حالياً."
-          onExplain={handleExplainCorrelation}
-          explanations={correlationExplanations}
-          explainingKey={correlationExplainingKey}
-        />
-        <CorrelationListCard
-          title="أثر الفئات على المقاييس"
-          items={businessNumericCategoricalHighlights}
-          limit={6}
-          emptyMessage="لا توجد روابط فئوية حالياً."
-          onExplain={handleExplainCorrelation}
-          explanations={correlationExplanations}
-          explainingKey={correlationExplainingKey}
-        />
-        <CorrelationListCard
-          title="روابط فئات متبادلة"
-          items={businessCategoricalHighlights}
-          limit={6}
-          emptyMessage="لا توجد روابط فئات متاحة."
-          onExplain={handleExplainCorrelation}
-          explanations={correlationExplanations}
-          explainingKey={correlationExplainingKey}
-        />
-      </section>
-
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-start">لوحة الرؤى</h2>
@@ -2072,15 +2069,25 @@ const StoryBIContent: React.FC = () => {
             <>
               <p className="text-sm text-muted-foreground text-start">{canvasNarrative}</p>
               {activeConfig?.chartType && column ? (
-                <Layer1Chart
-                  type={activeConfig.chartType}
-                  data={canvasData}
-                  x={canvasXAxis}
-                  y={activeConfig.chartType === 'combo' ? ['value'] : 'value'}
-                  secondaryY={activeConfig.chartType === 'combo' ? 'share' : undefined}
-                  emptyMessage="No data available for the selected combination."
-                  debugId="canvas-chart"
-                />
+                <>
+                  <Layer1Chart
+                    type={activeConfig.chartType}
+                    data={canvasData}
+                    x={canvasXAxis}
+                    y={activeConfig.chartType === 'combo' ? ['value'] : 'value'}
+                    secondaryY={activeConfig.chartType === 'combo' ? 'share' : undefined}
+                    emptyMessage="No data available for the selected combination."
+                    debugId="canvas-chart"
+                  />
+                  <ChartExplainButton
+                    chartTitle={`${metric?.title || metric?.id || 'KPI'} - ${activeConfig?.dimension || 'Analysis'}`}
+                    chartType={activeConfig.chartType}
+                    dataSummary={`Canvas chart: ${activeConfig.chartType} visualization with ${canvasData?.length || 0} data points`}
+                    onExplain={(ctx) => handleExplainChart("canvas-chart", ctx)}
+                    explanation={chartExplanations["canvas-chart"]}
+                    isLoading={chartExplainingKey === "canvas-chart"}
+                  />
+                </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
                   No sufficient data to visualise this request.
@@ -2094,6 +2101,60 @@ const StoryBIContent: React.FC = () => {
           {renderNarrative()}
         </div>
       </section>
+
+      {/* Correlations Section - Moved here to be after main visualizations */}
+      <BiSection
+        title={translate("الارتباطات والعلاقات")}
+        description={translate("استكشف العلاقات والارتباطات الإحصائية بين متغيرات البيانات")}
+      >
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <CorrelationListCard
+            title="أبرز الارتباطات العددية"
+            items={numericHighlights}
+            limit={6}
+            emptyMessage="لا توجد ارتباطات عددية متاحة."
+            onExplain={handleExplainCorrelation}
+            explanations={correlationExplanations}
+            explainingKey={correlationExplainingKey}
+          />
+          <CorrelationListCard
+            title="أبرز الارتباطات الزمنية"
+            items={datetimeHighlights}
+            limit={6}
+            emptyMessage="لا توجد ارتباطات زمنية متاحة."
+            onExplain={handleExplainCorrelation}
+            explanations={correlationExplanations}
+            explainingKey={correlationExplainingKey}
+          />
+          <CorrelationListCard
+            title="روابط أعمال"
+            items={businessNumericHighlights}
+            limit={6}
+            emptyMessage="لا توجد روابط أعمال حالياً."
+            onExplain={handleExplainCorrelation}
+            explanations={correlationExplanations}
+            explainingKey={correlationExplainingKey}
+          />
+          <CorrelationListCard
+            title="أثر الفئات على المقاييس"
+            items={businessNumericCategoricalHighlights}
+            limit={6}
+            emptyMessage="لا توجد روابط فئوية حالياً."
+            onExplain={handleExplainCorrelation}
+            explanations={correlationExplanations}
+            explainingKey={correlationExplainingKey}
+          />
+          <CorrelationListCard
+            title="روابط فئات متبادلة"
+            items={businessCategoricalHighlights}
+            limit={6}
+            emptyMessage="لا توجد روابط فئات متاحة."
+            onExplain={handleExplainCorrelation}
+            explanations={correlationExplanations}
+            explainingKey={correlationExplainingKey}
+          />
+        </div>
+      </BiSection>
 
       <form
         onSubmit={handleChatSubmit}

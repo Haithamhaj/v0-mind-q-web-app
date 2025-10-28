@@ -63,6 +63,7 @@ export default function PipelinePage() {
       running: translate("Running"),
       completed: translate("Completed"),
       skipped: translate("Skipped"),
+      deferred: translate("Deferred"),
     }),
     [translate],
   )
@@ -315,6 +316,33 @@ export default function PipelinePage() {
     })
   }
 
+  const handleRunKnimeBridge = async (runId: string) => {
+    try {
+      toast({
+        title: translate("KNIME Bridge"),
+        description: translate("Starting KNIME Bridge for {runId}...", { runId }),
+      })
+
+      await api.runKnimeBridge(runId, { use_defaults: true })
+
+      toast({
+        title: translate("KNIME Bridge completed"),
+        description: translate("KNIME artifacts generated successfully."),
+      })
+
+      // Refresh pipeline status
+      const updatedStatus = await api.getPipelineStatus(runId)
+      setPipelineProgress(updatedStatus)
+    } catch (error) {
+      console.error("[v0] KNIME Bridge execution failed:", error)
+      toast({
+        title: translate("KNIME Bridge failed"),
+        description: error instanceof Error ? error.message : translate("Failed to execute KNIME Bridge"),
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleRunPipeline = async () => {
     console.log("[v0] handleRunPipeline called")
     console.log("[v0] Current state - runId:", runId, "dataFiles:", dataFiles, "slaFiles:", slaFiles)
@@ -462,9 +490,11 @@ export default function PipelinePage() {
                   <CardDescription>
                     {pipelineProgress.status === "completed"
                       ? translate("Run {runId} completed successfully.", { runId })
-                      : pipelineProgress.status === "failed"
-                        ? translate("Run {runId} encountered an error.", { runId })
-                        : translate("Tracking run {runId}.", { runId })}
+                      : pipelineProgress.status === "completed_with_deferred"
+                        ? translate("Run {runId} completed with deferred tasks.", { runId })
+                        : pipelineProgress.status === "failed"
+                          ? translate("Run {runId} encountered an error.", { runId })
+                          : translate("Tracking run {runId}.", { runId })}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -491,7 +521,9 @@ export default function PipelinePage() {
                             ? "border-primary/60 bg-primary/10 text-primary"
                             : phase.status === "skipped"
                               ? "border-border bg-muted/40 text-muted-foreground"
-                              : "border-border text-muted-foreground"
+                              : phase.status === "deferred"
+                                ? "border-amber-500/60 bg-amber-500/10 text-amber-600"
+                                : "border-border text-muted-foreground"
                       return (
                         <div
                           key={phase.id}
@@ -511,6 +543,43 @@ export default function PipelinePage() {
                   {pipelineProgress.error && (
                     <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                       {pipelineProgress.error}
+                    </div>
+                  )}
+
+                  {/* Async Jobs Section */}
+                  {pipelineProgress.async_jobs && Object.keys(pipelineProgress.async_jobs).length > 0 && (
+                    <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                      <h3 className="font-semibold text-foreground">{translate("Deferred Tasks")}</h3>
+                      {Object.entries(pipelineProgress.async_jobs).map(([jobId, job]) => (
+                        <div key={jobId} className="space-y-2 rounded-md border border-border bg-card p-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">
+                                {pipelineProgress.phases.find((p) => p.id === job.phase)?.label || job.phase}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {translate("Status")}: {job.status} | {translate("Mode")}: {job.mode}
+                              </p>
+                            </div>
+                            {job.status === "waiting_for_user" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleRunKnimeBridge(pipelineProgress.run_id || runId)}
+                                className="bg-primary hover:bg-primary/90"
+                              >
+                                {translate("Run KNIME")}
+                              </Button>
+                            )}
+                          </div>
+                          {job.instructions && job.instructions.length > 0 && (
+                            <div className="space-y-1 text-xs text-muted-foreground">
+                              {job.instructions.map((instruction, idx) => (
+                                <p key={idx}>• {instruction}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </CardContent>
