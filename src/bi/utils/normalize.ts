@@ -8,21 +8,68 @@ const VALUE_ALIASES: Record<string, string> = {
   cod: "COD",
   "cash on delivery": "Cash On Delivery",
   "cash collected (cod)": "Cash Collected (COD)",
+  "cash_on_delivery": "Cash On Delivery",
   "credit card": "Credit Card",
   "credit-card": "Credit Card",
   "credit_card": "Credit Card",
   "creditcard": "Credit Card",
-  riyadh: "Riyadh",
-  "riyadh city": "Riyadh",
-  "al riyadh": "Riyadh",
-  "ar riyadh": "Riyadh",
-  makkah: "Makkah",
-  "makkah province": "Makkah Province",
-  medina: "Medina",
-  madinah: "Medina",
-  "al madinah": "Medina",
-  jeddah: "Jeddah",
-  dammam: "Dammam",
+  riyadh: "الرياض",
+  "riyadh city": "الرياض",
+  "al riyadh": "الرياض",
+  "ar riyadh": "الرياض",
+  "riyadh province": "الرياض",
+  makkah: "مكة المكرمة",
+  "makkah province": "مكة المكرمة",
+  "mecca": "مكة المكرمة",
+  medina: "المدينة المنورة",
+  madinah: "المدينة المنورة",
+  "al madinah": "المدينة المنورة",
+  jeddah: "جدة",
+  "jeddah city": "جدة",
+  dammam: "الدمام",
+  "al dammam": "الدمام",
+  tabuk: "تبوك",
+  abha: "أبها",
+  "al khobar": "الخبر",
+  khobar: "الخبر",
+  qassim: "القصيم",
+  hail: "حائل",
+  taif: "الطائف",
+  "al taif": "الطائف",
+  smsa: "سمسا",
+  "smsa express": "سمسا",
+  "smsa_express": "سمسا",
+  "سمسا": "سمسا",
+  spl: "SPL",
+  "spl company": "SPL",
+  "saudi post": "SPL",
+  "saudi-post": "SPL",
+  "البريد السعودي": "SPL",
+  aramex: "أرامكس",
+  "aramex express": "أرامكس",
+  "aramax": "أرامكس",
+  "أرامكس": "أرامكس",
+  naqel: "ناقل",
+  "naqel express": "ناقل",
+  "naqel-express": "ناقل",
+  "naqel logistics": "ناقل",
+  "naql": "ناقل",
+  "ناقل": "ناقل",
+  "j&t": "J&T Express",
+  "j&t express": "J&T Express",
+  "jt express": "J&T Express",
+  "j and t": "J&T Express",
+  "جي اند تي": "J&T Express",
+  "zajil": "زاجل",
+  "زاجل": "زاجل",
+  barq: "Barq",
+  "بارق": "بارق",
+  fetchr: "Fetchr",
+  dhl: "DHL",
+  "dhl express": "DHL",
+  ups: "UPS",
+  fedex: "FedEx",
+  tnt: "TNT",
 };
 
 const CANONICAL_DIMENSION_ALIASES: Record<string, Record<string, string>> = {
@@ -36,24 +83,152 @@ const CANONICAL_DIMENSION_ALIASES: Record<string, Record<string, string>> = {
     "cash on delivery": "COD",
     "cash-on-delivery": "COD",
     "cash_on_delivery": "COD",
+    "receiver_cod": "COD",
   },
   destination: {
-    riyadh: "Riyadh",
-    "riyadh city": "Riyadh",
-    "al riyadh": "Riyadh",
-    "ar riyadh": "Riyadh",
+    riyadh: "الرياض",
+    "riyadh city": "الرياض",
+    "al riyadh": "الرياض",
+    "ar riyadh": "الرياض",
+    "riyadh province": "الرياض",
     "الرياض": "الرياض",
     makkah: "مكة المكرمة",
-    "makkah province": "منطقة مكة",
+    "makkah province": "مكة المكرمة",
+    "mecca": "مكة المكرمة",
     "مكة": "مكة المكرمة",
-    "جدة": "جدة",
+    "مكة المكرمة": "مكة المكرمة",
     jeddah: "جدة",
+    "جدة": "جدة",
     dammam: "الدمام",
     "الدمام": "الدمام",
+    tabuk: "تبوك",
+    "تبوك": "تبوك",
+    abha: "أبها",
+    "أبها": "أبها",
+    taif: "الطائف",
+    "al taif": "الطائف",
+    "الطائف": "الطائف",
+    hail: "حائل",
+    "حائل": "حائل",
+    khobar: "الخبر",
+    "al khobar": "الخبر",
+    "الخبر": "الخبر",
+    qassim: "القصيم",
+    "al qassim": "القصيم",
+    "القصيم": "القصيم",
     medina: "المدينة المنورة",
+    madinah: "المدينة المنورة",
+    "al madinah": "المدينة المنورة",
     "المدينة": "المدينة المنورة",
     "المدينة المنورة": "المدينة المنورة",
   },
+};
+
+const LOGISTICS_DIMENSION_KEYS = [
+  "carrier",
+  "carrier_name",
+  "courier",
+  "courier_name",
+  "delivery_company",
+  "delivery_partner",
+  "delivery_provider",
+  "delivery_service",
+  "fulfillment_partner",
+  "fulfillment_provider",
+  "last_mile_carrier",
+  "lastmile_carrier",
+  "logistics_company",
+  "logistics_partner",
+  "logistics_provider",
+  "shipping_company",
+  "shipment_carrier",
+  "vendor",
+  "service_provider",
+];
+
+const LOGISTICS_ALIASES: Record<string, string> = {
+  smsa: "سمسا",
+  "smsa express": "سمسا",
+  "smsa_express": "سمسا",
+  "سمسا": "سمسا",
+  aramex: "أرامكس",
+  "aramex express": "أرامكس",
+  "aramax": "أرامكس",
+  "أرامكس": "أرامكس",
+  naqel: "ناقل",
+  "naqel express": "ناقل",
+  "naqel-express": "ناقل",
+  "naqel logistics": "ناقل",
+  "naql": "ناقل",
+  "ناقل": "ناقل",
+  "j&t": "J&T Express",
+  "j&t express": "J&T Express",
+  "jt express": "J&T Express",
+  "j and t": "J&T Express",
+  "جي اند تي": "J&T Express",
+  spl: "SPL",
+  "spl company": "SPL",
+  "saudi post": "SPL",
+  "saudi-post": "SPL",
+  "البريد السعودي": "SPL",
+  "مؤسسة البريد السعودي": "SPL",
+  zajil: "زاجل",
+  "زاجل": "زاجل",
+  barq: "Barq",
+  "بارق": "بارق",
+  fetchr: "Fetchr",
+  dhl: "DHL",
+  "dhl express": "DHL",
+  ups: "UPS",
+  fedex: "FedEx",
+  tnt: "TNT",
+  "smsa logistics": "سمسا",
+};
+
+for (const key of LOGISTICS_DIMENSION_KEYS) {
+  CANONICAL_DIMENSION_ALIASES[key] = {
+    ...(CANONICAL_DIMENSION_ALIASES[key] ?? {}),
+    ...LOGISTICS_ALIASES,
+  };
+}
+
+const normalizeDimensionKey = (rawKey: string): string => {
+  const normalized = rawKey.trim().toLowerCase();
+  if (!normalized) {
+    return normalized;
+  }
+  if (normalized in CANONICAL_DIMENSION_ALIASES) {
+    return normalized;
+  }
+  if (
+    normalized.includes("payment") ||
+    normalized.includes("pay_method") ||
+    normalized.includes("paymethod") ||
+    normalized.includes("receiver_mode") ||
+    normalized.includes("receiver-mode")
+  ) {
+    return "payment_method";
+  }
+  if (
+    normalized.includes("destination") ||
+    normalized.includes("dest_city") ||
+    normalized.includes("city") ||
+    normalized.includes("region")
+  ) {
+    return "destination";
+  }
+  if (
+    normalized.includes("carrier") ||
+    normalized.includes("courier") ||
+    normalized.includes("delivery_company") ||
+    normalized.includes("delivery-company") ||
+    normalized.includes("delivery_provider") ||
+    normalized.includes("logistics") ||
+    normalized.includes("shipping")
+  ) {
+    return "carrier";
+  }
+  return normalized;
 };
 
 const titleCase = (value: string) =>
@@ -61,7 +236,13 @@ const titleCase = (value: string) =>
     .toLowerCase()
     .split(/\s+/g)
     .filter((token) => token.length > 0)
-    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .map((token) => {
+      const alphaLength = token.replace(/[^a-z]/g, "").length;
+      if (alphaLength > 0 && alphaLength <= 4 && /^[a-z0-9&+/.-]+$/.test(token)) {
+        return token.replace(/[a-z]/g, (char) => char.toUpperCase());
+      }
+      return token.charAt(0).toUpperCase() + token.slice(1);
+    })
     .join(" ");
 
 const canonicalizePlainValue = (rawValue: string): string => {
@@ -196,17 +377,35 @@ export const canonicalizeDimensionValue = (dimensionKey: string, rawValue: strin
     return "";
   }
 
-  const aliasMap = CANONICAL_DIMENSION_ALIASES[dimensionKey];
-  if (aliasMap) {
-    const lowerValue = collapsed.toLowerCase();
-    if (aliasMap[lowerValue]) {
-      return aliasMap[lowerValue];
+  if (collapsed.includes("/")) {
+    const parts = collapsed
+      .split("/")
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+      .map((segment) => canonicalizeDimensionValue(dimensionKey, segment));
+    const uniqueParts = Array.from(new Set(parts.filter(Boolean)));
+    if (uniqueParts.length === 1) {
+      return uniqueParts[0];
     }
   }
 
-  const genericAlias = VALUE_ALIASES[collapsed.toLowerCase()];
-  if (genericAlias) {
-    return genericAlias;
+  const effectiveKey = normalizeDimensionKey(dimensionKey);
+  const aliasMap = CANONICAL_DIMENSION_ALIASES[effectiveKey];
+  const lowerValue = collapsed.toLowerCase();
+  const normalizedWhitespace = lowerValue.replace(/[\s/_-]+/g, " ").trim();
+  const aliasCandidates = [lowerValue, normalizedWhitespace, collapsed];
+
+  for (const candidate of aliasCandidates) {
+    if (aliasMap && aliasMap[candidate]) {
+      return aliasMap[candidate];
+    }
+  }
+
+  for (const candidate of aliasCandidates) {
+    const lookupKey = typeof candidate === "string" ? candidate.toLowerCase() : candidate;
+    if (VALUE_ALIASES[lookupKey]) {
+      return VALUE_ALIASES[lookupKey];
+    }
   }
 
   if (ARABIC_CHAR_REGEX.test(collapsed)) {
