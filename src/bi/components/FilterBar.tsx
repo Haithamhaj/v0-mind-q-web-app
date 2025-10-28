@@ -10,7 +10,7 @@ const MAX_PER_DIMENSION = 40;
 export const FilterBar: React.FC = () => {
   const { dimensions, dataset, filters, setFilter, loading } = useBiData();
 
-  const categorical = dimensions.categorical ?? [];
+  const categorical = useMemo(() => dimensions.categorical ?? [], [dimensions.categorical]);
 
   const options = useMemo(() => {
     const lookup: Record<string, string[]> = {};

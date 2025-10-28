@@ -352,7 +352,7 @@ const StoryBIPage: React.FC = () => {
   }, []);
 
   const runId = selectedRun ?? "run-latest";
-  const providerEndpoints = useMemo(() => buildRunAwareEndpoints(runId), [runId, refreshToken]);
+  const providerEndpoints = useMemo(() => buildRunAwareEndpoints(runId), [runId]);
   const providerKey = useMemo(() => `${runId}-${refreshToken}`, [runId, refreshToken]);
   const runInfo = useMemo(
     () => runs.find((run) => run.run_id === runId) ?? { run_id: runId, updated_at: undefined },

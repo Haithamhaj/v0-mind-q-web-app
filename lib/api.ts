@@ -138,6 +138,52 @@ export interface BiMetricResponse {
   currency?: string
 }
 
+export interface BiCorrelationExplainRequest {
+  run: string
+  feature_a: string
+  feature_b: string
+  kind?: string | null
+  language?: "ar" | "en"
+  use_llm?: boolean
+  force_refresh?: boolean
+  provider?: string | null
+  model?: string | null
+  temperature?: number | null
+  max_tokens?: number | null
+}
+
+export interface BiCorrelationExplanation {
+  summary?: string
+  recommended_actions?: string[]
+  confidence?: string | null
+  mode?: string | null
+  provider?: string | null
+  model?: string | null
+  generated_at?: string | null
+  tokens_in?: number | null
+  tokens_out?: number | null
+  cost_estimate?: number | null
+  duration_s?: number | null
+  language?: string | null
+  correlation?: number | null
+  run?: string | null
+  feature_a?: string | null
+  feature_b?: string | null
+  kind?: string | null
+  context?: Record<string, unknown> | null
+  [key: string]: unknown
+}
+
+export interface BiCorrelationExplainResponse {
+  run: string
+  feature_a: string
+  feature_b: string
+  kind: string
+  correlation?: number | null
+  record: Record<string, unknown>
+  explanation: BiCorrelationExplanation
+}
+
 class MindQAPI {
   private baseURL: string
 
@@ -347,6 +393,10 @@ class MindQAPI {
   async getBiMetric(runId: string, metricId: string, artifactsRoot?: string): Promise<BiMetricResponse> {
     const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
     return this.get(`/v1/bi/${runId}/metrics/${encodeURIComponent(metricId)}${query}`)
+  }
+
+  async explainBiCorrelation(request: BiCorrelationExplainRequest): Promise<BiCorrelationExplainResponse> {
+    return this.post(`/api/bi/correlations/explain`, request)
   }
 
   async getArtifactContent(runId: string, path: string, artifactsRoot?: string): Promise<ArtifactContentResponse> {

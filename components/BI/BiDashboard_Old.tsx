@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,15 +33,7 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
   const codRateChartRef = useRef<HTMLDivElement>(null);
   const trendsChartRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (metrics && Object.keys(metrics).length > 0 && !isLoading) {
-      setTimeout(() => {
-        initializeCharts(metrics);
-      }, 100);
-    }
-  }, [metrics, isLoading]);
-
-  const initializeCharts = (data: any) => {
+  const initializeCharts = useCallback((data: any) => {
     // Orders by Destination Chart (replacing daily orders with geographic data)
     if (ordersChartRef.current && data.orders_by_destination?.length > 0) {
       const chart = echarts.init(ordersChartRef.current);
@@ -212,35 +204,6 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
         animationDuration: 1000
       });
     }
-  };
-        },
-        xAxis: { type: 'value' },
-        yAxis: {
-          type: 'category',
-          data: data.avg_cod_amount_destination.map((item: any) => item.destination || item.dim),
-          axisLabel: { interval: 0, fontSize: 10 }
-        },
-        series: [{
-          name: 'متوسط المبلغ',
-          type: 'bar',
-          data: data.avg_cod_amount_destination.map((item: any) => item.avg_amount || item.val),
-          itemStyle: { 
-            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              { offset: 0, color: '#10b981' },
-              { offset: 1, color: '#34d399' }
-            ])
-          },
-          label: {
-            show: true,
-            position: 'right',
-            fontSize: 10
-          }
-        }],
-        grid: { left: '25%', right: '10%', bottom: '3%', top: '5%', containLabel: true },
-        animation: true,
-        animationDuration: 1200
-      });
-    }
 
     // COD Rate Chart
     if (codRateChartRef.current && data.cod_rate_daily?.length > 0) {
@@ -343,7 +306,15 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
         animationDuration: 1500
       });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (metrics && Object.keys(metrics).length > 0 && !isLoading) {
+      setTimeout(() => {
+        initializeCharts(metrics);
+      }, 100);
+    }
+  }, [metrics, isLoading, initializeCharts]);
 
   const calculateMovingAverage = (data: number[], window: number) => {
     const result = [];
@@ -522,7 +493,7 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
                 <CardDescription>تتبع كمية الطلبات عبر الزمن</CardDescription>
               </CardHeader>
               <CardContent>
-                <div ref={ordersChartRef} style={{ width: '100%', height: '300px' }}></div>
+                <div ref={ordersChartRef} className="h-[300px] w-full"></div>
               </CardContent>
             </Card>
 
@@ -538,7 +509,7 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
                 <CardDescription>نسبة الطلبات المدفوعة عند التسليم</CardDescription>
               </CardHeader>
               <CardContent>
-                <div ref={codRateChartRef} style={{ width: '100%', height: '300px' }}></div>
+                <div ref={codRateChartRef} className="h-[300px] w-full"></div>
               </CardContent>
             </Card>
           </div>
@@ -554,7 +525,7 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
               <CardDescription>الطلبات اليومية مع المتوسط المتحرك</CardDescription>
             </CardHeader>
             <CardContent>
-              <div ref={trendsChartRef} style={{ width: '100%', height: '400px' }}></div>
+              <div ref={trendsChartRef} className="h-[400px] w-full"></div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -587,7 +558,7 @@ export function BiDashboard({ runId, metrics, isLoading }: BiDashboardProps) {
               <CardDescription>متوسط مبلغ الدفع عند التسليم حسب الوجهة</CardDescription>
             </CardHeader>
             <CardContent>
-              <div ref={codAmountChartRef} style={{ width: '100%', height: '500px' }}></div>
+              <div ref={codAmountChartRef} className="h-[500px] w-full"></div>
             </CardContent>
           </Card>
         </TabsContent>

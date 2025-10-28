@@ -5,16 +5,10 @@ import { ArrowDownRight, ArrowUpRight, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { BiCorrelationExplanation } from "@/lib/api";
 
 import type { CorrelationPair } from "../data";
-import { normalizeLabelText, formatSourcePath } from "../utils/normalize";
-
-type CorrelationInsight = {
-  summary?: string;
-  recommended_actions?: string[];
-  confidence?: string | null;
-  mode?: string | null;
-};
+import { formatSourcePath, normalizeLabelText, resolveLabelParts, type LabelParts } from "../utils/normalize";
 
 export const correlationPairKey = (item: CorrelationPair): string => {
   const ordered = [String(item.feature_a ?? ""), String(item.feature_b ?? "")].sort((a, b) =>
@@ -28,9 +22,80 @@ type CorrelationListCardProps = {
   items: CorrelationPair[];
   limit?: number;
   emptyMessage?: string;
-  explanations?: Record<string, CorrelationInsight | undefined>;
+  explanations?: Record<string, BiCorrelationExplanation | undefined>;
   explainingKey?: string | null;
   onExplain?: (item: CorrelationPair) => void;
+};
+
+const labelFromParts = (parts: LabelParts, fallback?: string): string => {
+  if (parts.primary) {
+    return parts.primary;
+  }
+  if (parts.secondary) {
+    return parts.secondary;
+  }
+  return fallback ?? "";
+};
+
+const secondaryFromParts = (parts: LabelParts): string | undefined => {
+  if (parts.secondary && parts.secondary !== parts.primary) {
+    return parts.secondary;
+  }
+  return undefined;
+};
+
+type NarrativeArgs = {
+  item: CorrelationPair;
+  driverName: string;
+  targetName: string;
+  correlationValue: string;
+  sampleLabel: string;
+  pValue?: string;
+  impactLabel?: string;
+};
+
+const buildCorrelationNarrative = ({ item, driverName, targetName, correlationValue, sampleLabel, pValue, impactLabel }: NarrativeArgs): string | undefined => {
+  const cleanDriver = driverName.trim();
+  const cleanTarget = targetName.trim();
+  if (!cleanDriver || !cleanTarget) {
+    return undefined;
+  }
+
+  const corr = typeof item.correlation === "number" ? item.correlation : null;
+  const sentences: string[] = [];
+
+  if (corr !== null) {
+    const magnitude = Math.abs(corr);
+    let strength = "ضعيف";
+    if (magnitude >= 0.75) {
+      strength = "قوي جدًا";
+    } else if (magnitude >= 0.55) {
+      strength = "قوي";
+    } else if (magnitude >= 0.35) {
+      strength = "متوسط";
+    } else if (magnitude >= 0.2) {
+      strength = "خفيف";
+    }
+    const relation = corr >= 0 ? "طردي" : "عكسي";
+    const stats = pValue ? `${correlationValue} (p=${pValue})` : correlationValue;
+    sentences.push(`هناك ارتباط ${relation} ${strength} بين ${cleanDriver} و${cleanTarget} بقيمة ${stats}.`);
+  } else {
+    sentences.push(`الارتباط بين ${cleanDriver} و${cleanTarget} يتطلب مراجعة إضافية للبيانات.`);
+  }
+
+  if (sampleLabel && sampleLabel !== "—") {
+    sentences.push(`استند القياس إلى عينة تقارب ${sampleLabel} سجل.`);
+  }
+
+  if (impactLabel) {
+    sentences.push(`التأثير المتوقع على ${cleanTarget} يقارب ${impactLabel}.`);
+  } else if (item.effect_direction === "improves") {
+    sentences.push(`${cleanDriver} يرتبط عادةً بتحسّن ${cleanTarget}.`);
+  } else if (item.effect_direction === "worsens") {
+    sentences.push(`${cleanDriver} يرتبط غالبًا بتراجع ${cleanTarget}.`);
+  }
+
+  return sentences.join(" ");
 };
 
 const correlationFormatter = new Intl.NumberFormat("en-US", {
@@ -137,26 +202,83 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
               const tone = directionTone(item.effect_direction, item.correlation);
               const impactLabel = formatImpact(item);
 
-              const featureALabel = normalizeLabelText(item.feature_a_label, item.feature_a);
-              const featureBLabel = normalizeLabelText(item.feature_b_label, item.feature_b);
-              const businessLabel = normalizeLabelText(item.business_label);
-              const pairLabel = [featureALabel, featureBLabel].filter(Boolean).join(" ↔ ");
-              const fallbackPair = `${normalizeLabelText(item.feature_a) || item.feature_a || "المؤشر الأول"} ↔ ${normalizeLabelText(item.feature_b) || item.feature_b || "المؤشر الثاني"}`;
-              const primaryLabel = businessLabel || pairLabel || fallbackPair;
+              const featureAParts = resolveLabelParts(item.feature_a_label, item.feature_a);
+              const featureBParts = resolveLabelParts(item.feature_b_label, item.feature_b);
+              const businessParts = resolveLabelParts(item.business_label);
+
+              const fallbackPrimaryPair = [labelFromParts(featureAParts, normalizeLabelText(item.feature_a)), labelFromParts(featureBParts, normalizeLabelText(item.feature_b))]
+                .filter(Boolean)
+                .join(" ↔ ");
+              const fallbackSecondaryPair = [secondaryFromParts(featureAParts), secondaryFromParts(featureBParts)]
+                .filter(Boolean)
+                .join(" ↔ ");
+
+              const primaryLabel = businessParts.primary || fallbackPrimaryPair || "الارتباط";
+              let secondaryLabel = secondaryFromParts(businessParts) || (fallbackSecondaryPair && fallbackSecondaryPair !== fallbackPrimaryPair ? fallbackSecondaryPair : undefined);
+              if (secondaryLabel === primaryLabel) {
+                secondaryLabel = undefined;
+              }
+              if (secondaryLabel && !secondaryLabel.trim()) {
+                secondaryLabel = undefined;
+              }
+
+              const kpiLabelParts = resolveLabelParts(item.kpi_label);
+              const kpiBadgeLabel = labelFromParts(kpiLabelParts);
+              const kpiBadgeHint = secondaryFromParts(kpiLabelParts);
+
+              let driverParts = featureAParts;
+              let targetParts = featureBParts;
+              let driverFallback = normalizeLabelText(item.feature_a_label, item.feature_a);
+              let targetFallback = normalizeLabelText(item.feature_b_label, item.feature_b);
+
+              if (item.kpi_feature) {
+                if (item.kpi_feature === item.feature_a) {
+                  targetParts = resolveLabelParts(item.kpi_label ?? item.feature_a_label, item.feature_a);
+                  targetFallback = normalizeLabelText(item.kpi_label ?? item.feature_a_label, item.feature_a);
+                  driverParts = featureBParts;
+                  driverFallback = normalizeLabelText(item.feature_b_label, item.feature_b);
+                } else if (item.kpi_feature === item.feature_b) {
+                  targetParts = resolveLabelParts(item.kpi_label ?? item.feature_b_label, item.feature_b);
+                  targetFallback = normalizeLabelText(item.kpi_label ?? item.feature_b_label, item.feature_b);
+                  driverParts = featureAParts;
+                  driverFallback = normalizeLabelText(item.feature_a_label, item.feature_a);
+                } else {
+                  targetParts = resolveLabelParts(item.kpi_label, item.kpi_feature);
+                  targetFallback = normalizeLabelText(item.kpi_label, item.kpi_feature);
+                }
+              } else if (item.kpi_label) {
+                targetParts = resolveLabelParts(item.kpi_label);
+                targetFallback = normalizeLabelText(item.kpi_label);
+              }
+
+              const driverName = labelFromParts(driverParts, driverFallback);
+              const targetName = labelFromParts(targetParts, targetFallback);
 
               const driverDomainRaw =
                 item.driver_domain ||
                 (item.kpi_feature && item.kpi_feature === item.feature_a ? item.feature_b_domain : item.feature_a_domain) ||
                 item.feature_b_domain ||
                 item.feature_a_domain;
-              const driverDomain = normalizeLabelText(driverDomainRaw);
+              const driverDomainParts = resolveLabelParts(driverDomainRaw);
+              const driverDomain = labelFromParts(driverDomainParts, normalizeLabelText(driverDomainRaw));
 
-              const directionLabel =
+              const directionBadgeLabel =
                 item.effect_direction === "improves"
-                  ? "يحسّن KPI"
+                  ? `يعزّز ${targetName}`
                   : item.effect_direction === "worsens"
-                    ? "يضعف KPI"
+                    ? `يضعف ${targetName}`
                     : undefined;
+
+              const autoNarrative = buildCorrelationNarrative({
+                item,
+                driverName,
+                targetName,
+                correlationValue,
+                sampleLabel,
+                pValue,
+                impactLabel,
+              });
+              const summaryText = item.impact_summary || autoNarrative;
 
               return (
                 <li key={key} className="rounded-2xl border border-border/40 bg-muted/10 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-border">
@@ -164,15 +286,20 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-foreground">{primaryLabel}</span>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-foreground" title={secondaryLabel ? `${primaryLabel} — ${secondaryLabel}` : primaryLabel}>
+                              {primaryLabel}
+                            </div>
+                            {secondaryLabel ? <div className="text-[11px] text-muted-foreground">{secondaryLabel}</div> : null}
+                          </div>
                           {item.is_persistent && (
                             <Badge variant="outline" className="border-emerald-400/40 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400">
                               نمط مستقر
                             </Badge>
                           )}
-                          {item.kpi_label && (
-                            <Badge variant="secondary" className="bg-primary/10 text-primary">
-                              {normalizeLabelText(item.kpi_label)}
+                          {kpiBadgeLabel && (
+                            <Badge variant="secondary" className="bg-primary/10 text-primary" title={kpiBadgeHint}>
+                              {kpiBadgeLabel}
                             </Badge>
                           )}
                         </div>
@@ -182,7 +309,7 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                               {driverDomain}
                             </Badge>
                           )}
-                          {directionLabel && (
+                          {directionBadgeLabel && (
                             <Badge
                               variant="outline"
                               className={clsx(
@@ -190,7 +317,7 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                                 item.effect_direction === "improves" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400",
                               )}
                             >
-                              {directionLabel}
+                              {directionBadgeLabel}
                             </Badge>
                           )}
                           {item.history_runs?.length ? (
@@ -223,9 +350,7 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                         )}
                       </div>
                     </div>
-                    {item.impact_summary && (
-                      <p className="text-xs text-muted-foreground">{item.impact_summary}</p>
-                    )}
+                    {summaryText && <p className="text-xs text-muted-foreground">{summaryText}</p>}
                     <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
                       <span className="truncate" title={item.source ?? undefined}>{formatSourcePath(item.source)}</span>
                       {onExplain ? (
@@ -247,26 +372,36 @@ export const CorrelationListCard: React.FC<CorrelationListCardProps> = ({
                         جاري توليد الشرح المدعوم بالذكاء الاصطناعي...
                       </div>
                     )}
-                    {!isLoading && explanation && (explanation.summary || explanation.recommended_actions?.length) ?
-                      (
-                        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-xs text-primary-foreground/90 shadow-sm">
-                          {explanation.summary && <p className="font-medium text-primary">{explanation.summary}</p>}
-                          {explanation.recommended_actions && explanation.recommended_actions.length > 0 && (
-                            <ul className="mt-2 space-y-1 text-right leading-relaxed">
-                              {explanation.recommended_actions.map((action, index) => (
-                                <li key={`${key}-action-${index}`} className="flex items-start gap-2">
-                                  <span className="text-primary/70">•</span>
-                                  <span className="flex-1">{action}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] uppercase text-muted-foreground">
-                            {explanation.confidence && <span>الثقة: {explanation.confidence}</span>}
-                            {explanation.mode && <span>المصدر: {explanation.mode}</span>}
-                          </div>
+                    {!isLoading && explanation && (explanation.summary || explanation.recommended_actions?.length) ? (
+                      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3 text-xs text-primary-foreground/90 shadow-sm">
+                        {explanation.summary && <p className="font-medium text-primary">{explanation.summary}</p>}
+                        {explanation.recommended_actions && explanation.recommended_actions.length > 0 && (
+                          <ul className="mt-2 space-y-1 text-right leading-relaxed">
+                            {explanation.recommended_actions.map((action, index) => (
+                              <li key={`${key}-action-${index}`} className="flex items-start gap-2">
+                                <span className="text-primary/70">•</span>
+                                <span className="flex-1">{action}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] uppercase text-muted-foreground">
+                          {explanation.confidence && <span>الثقة: {explanation.confidence}</span>}
+                          {explanation.mode && <span>الوضع: {explanation.mode}</span>}
+                          {explanation.provider && <span>المزوّد: {explanation.provider}</span>}
+                          {explanation.model && <span>النموذج: {explanation.model}</span>}
+                          {typeof explanation.tokens_in === "number" || typeof explanation.tokens_out === "number" ? (
+                            <span>
+                              Tokens {typeof explanation.tokens_in === "number" ? Math.round(explanation.tokens_in) : "—"}/
+                              {typeof explanation.tokens_out === "number" ? Math.round(explanation.tokens_out) : "—"}
+                            </span>
+                          ) : null}
+                          {typeof explanation.cost_estimate === "number" && explanation.cost_estimate > 0 ? (
+                            <span>التكلفة≈${explanation.cost_estimate.toFixed(4)}</span>
+                          ) : null}
                         </div>
-                      ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );

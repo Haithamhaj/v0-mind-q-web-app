@@ -95,6 +95,12 @@ const canonicalizePlainValue = (rawValue: string): string => {
   });
 };
 
+export type LabelParts = {
+  primary: string;
+  secondary?: string;
+  combined: string;
+};
+
 const parseLocalizationMap = (value: string): Record<string, string> => {
   const mapping: Record<string, string> = {};
   const sanitized = value.trim();
@@ -137,6 +143,53 @@ const parseLocalizationMap = (value: string): Record<string, string> => {
   return mapping;
 };
 
+const combineLabel = (primary?: string, secondary?: string): LabelParts => {
+  const main = primary?.trim() ?? "";
+  const secondaryClean = secondary?.trim();
+  if (main && secondaryClean && secondaryClean !== main) {
+    return {
+      primary: main,
+      secondary: secondaryClean,
+      combined: `${main} (${secondaryClean})`,
+    };
+  }
+  return {
+    primary: main,
+    secondary: undefined,
+    combined: main,
+  };
+};
+
+export const resolveLabelParts = (primary?: string | null, fallback?: string | null): LabelParts => {
+  const candidate = primary ?? fallback ?? "";
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return { primary: "", secondary: undefined, combined: "" };
+  }
+
+  const localization = parseLocalizationMap(trimmed);
+  const ar = localization.ar?.trim();
+  const en = localization.en?.trim() ?? localization.label?.trim();
+
+  const canonicalAr = ar ? canonicalizePlainValue(ar) : undefined;
+  const canonicalEn = en ? canonicalizePlainValue(en) : undefined;
+
+  if (canonicalAr && canonicalEn && canonicalAr !== canonicalEn) {
+    return combineLabel(canonicalAr, canonicalEn);
+  }
+
+  if (canonicalAr) {
+    return combineLabel(canonicalAr);
+  }
+
+  if (canonicalEn) {
+    return combineLabel(canonicalEn);
+  }
+
+  const normalized = canonicalizePlainValue(trimmed);
+  return combineLabel(normalized);
+};
+
 export const canonicalizeDimensionValue = (dimensionKey: string, rawValue: string): string => {
   const collapsed = rawValue.trim();
   if (!collapsed) {
@@ -172,31 +225,8 @@ export const canonicalizeDimensionValue = (dimensionKey: string, rawValue: strin
 };
 
 export const normalizeLabelText = (primary?: string | null, fallback?: string | null): string => {
-  const candidate = primary ?? fallback ?? "";
-  const trimmed = candidate.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  const localization = parseLocalizationMap(trimmed);
-  const ar = localization.ar?.trim();
-  const en = localization.en?.trim() ?? localization.label?.trim();
-
-  if (ar && en && ar !== en) {
-    const canonicalAr = canonicalizePlainValue(ar);
-    const canonicalEn = canonicalizePlainValue(en);
-    return `${canonicalAr} (${canonicalEn})`;
-  }
-
-  if (ar) {
-    return canonicalizePlainValue(ar);
-  }
-
-  if (en) {
-    return canonicalizePlainValue(en);
-  }
-
-  return canonicalizePlainValue(trimmed);
+  const parts = resolveLabelParts(primary, fallback);
+  return parts.combined;
 };
 
 export const formatSourcePath = (path?: string | null): string => {

@@ -41,6 +41,7 @@ import type {
   Layer2AgentRecommendation,
   MetricSpec,
 } from '../data';
+import { api, type BiCorrelationExplanation } from '@/lib/api';
 import { featureFlags } from '../../../config/features';
 
 type ChatMessage = {
@@ -96,15 +97,6 @@ type RawMetricsTrends = {
   daily?: RawMetricsChart;
   hour_of_day?: RawMetricsChart;
   weekday?: RawMetricsChart;
-};
-
-type CorrelationExplanationPayload = {
-  summary?: string;
-  recommended_actions?: string[];
-  confidence?: string | null;
-  mode?: string | null;
-  provider?: string | null;
-  model?: string | null;
 };
 
 type CorrelationFilterState = {
@@ -819,7 +811,7 @@ const StoryBIContent: React.FC = () => {
   }, [layer1PendingRecommendation, dataset, metrics, dimensions]);
   const breakdowns = useMemo(() => rawMetrics?.breakdowns ?? [], [rawMetrics]);
   const [correlationFilterState, setCorrelationFilterState] = useState<CorrelationFilterState>(DEFAULT_CORRELATION_FILTER);
-  const [correlationExplanations, setCorrelationExplanations] = useState<Record<string, CorrelationExplanationPayload>>({});
+  const [correlationExplanations, setCorrelationExplanations] = useState<Record<string, BiCorrelationExplanation | undefined>>({});
   const [correlationExplainingKey, setCorrelationExplainingKey] = useState<string | null>(null);
   const [correlationError, setCorrelationError] = useState<string | null>(null);
 
@@ -993,25 +985,18 @@ const StoryBIContent: React.FC = () => {
       setCorrelationError(null);
       setCorrelationExplainingKey(key);
       try {
-        const response = await fetch('/api/bi/correlations/explain', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            run: activeRun,
-            feature_a: item.feature_a,
-            feature_b: item.feature_b,
-            kind: item.kind ?? 'numeric',
-            language,
-            use_llm: true,
-          }),
+        const response = await api.explainBiCorrelation({
+          run: activeRun,
+          feature_a: item.feature_a,
+          feature_b: item.feature_b,
+          kind: item.kind ?? 'numeric',
+          language,
+          use_llm: true,
         });
-        if (!response.ok) {
-          const detail = await response.text();
-          throw new Error(detail || `Failed to generate explanation (${response.status})`);
+        if (!response?.explanation) {
+          throw new Error('لم يتم استلام شرح من الخادم');
         }
-        const data = await response.json();
-        const payload: CorrelationExplanationPayload = data?.explanation ?? {};
-        setCorrelationExplanations((prev) => ({ ...prev, [key]: payload }));
+        setCorrelationExplanations((prev) => ({ ...prev, [key]: response.explanation }));
       } catch (error) {
         console.error('[story-bi] correlation explain failed', error);
         setCorrelationError(error instanceof Error ? error.message : 'تعذر توليد الشرح');

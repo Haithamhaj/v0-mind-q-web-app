@@ -50,18 +50,9 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
 }) => {
   const primary = ensureArray(y);
   const secondarySeries = ensureArray(secondaryY);
+  const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
-  if (loading) {
-    return (
-      <div className="h-[280px] w-full animate-pulse rounded-2xl border border-border/30 bg-muted/50" aria-hidden="true" />
-    );
-  }
-
-  if (!data || !data.length || !primary.length) {
-    return <EmptyState message={emptyMessage} />;
-  }
-
-  const categories = useMemo(() => data.map((d) => String((d as any)[x])), [data, x]);
+  const categories = useMemo(() => safeData.map((d) => String((d as any)[x])), [safeData, x]);
 
   const buildSeries = useCallback((): SeriesOption[] => {
     if (type === "funnel") {
@@ -69,7 +60,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
       return [
         {
           type: "funnel",
-          data: data.map((row, idx) => ({
+          data: safeData.map((row, idx) => ({
             name: String((row as any)[x]),
             value: Number((row as any)[key] ?? 0),
             __row: row,
@@ -84,7 +75,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
         {
           type: "treemap",
           roam: false,
-          data: data.map((row, idx) => ({
+          data: safeData.map((row, idx) => ({
             name: String((row as any)[x]),
             value: Number((row as any)[key] ?? 0),
             __row: row,
@@ -99,7 +90,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
       smooth: type === "line" || type === "area",
       areaStyle: type === "area" ? {} : undefined,
       name: key,
-      data: data.map((row) => ({ value: Number((row as any)[key] ?? 0), ...row })),
+      data: safeData.map((row) => ({ value: Number((row as any)[key] ?? 0), ...row })),
       itemStyle: { color: palette[idx % palette.length] },
     }));
 
@@ -108,24 +99,30 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
       yAxisIndex: 1,
       smooth: true,
       name: key,
-      data: data.map((row) => ({ value: Number((row as any)[key] ?? 0), ...row })),
+      data: safeData.map((row) => ({ value: Number((row as any)[key] ?? 0), ...row })),
       itemStyle: { color: palette[(primary.length + idx) % palette.length] },
     }));
 
     return [...primarySeries, ...secondaries];
-  }, [type, primary, secondarySeries, data, x, palette]);
+  }, [type, primary, secondarySeries, safeData, x, palette]);
 
-  const option: EChartsCoreOption = useMemo(() => ({
-    tooltip: { trigger: type === "funnel" || type === "treemap" ? "item" : "axis" },
-    grid: { top: 24, right: secondarySeries.length ? 48 : 16, bottom: 40, left: 40 },
-    xAxis: type === "funnel" || type === "treemap" ? undefined : { type: "category", data: categories },
-    yAxis: type === "funnel" || type === "treemap" ? undefined : [
-      { type: "value" },
-      ...(secondarySeries.length ? [{ type: "value" }] : []),
-    ],
-    legend: { top: 0 },
-    series: buildSeries(),
-  }), [type, categories, buildSeries, secondarySeries.length]);
+  const option: EChartsCoreOption = useMemo(
+    () => ({
+      tooltip: { trigger: type === "funnel" || type === "treemap" ? "item" : "axis" },
+      grid: { top: 24, right: secondarySeries.length ? 48 : 16, bottom: 40, left: 40 },
+      xAxis: type === "funnel" || type === "treemap" ? undefined : { type: "category", data: categories },
+      yAxis:
+        type === "funnel" || type === "treemap"
+          ? undefined
+          : [
+              { type: "value" },
+              ...(secondarySeries.length ? [{ type: "value" }] : []),
+            ],
+      legend: { top: 0 },
+      series: buildSeries(),
+    }),
+    [type, categories, buildSeries, secondarySeries.length],
+  );
 
   const handleReady = useCallback((instance: EChartsType) => {
     if (!onPointClick) return;
@@ -135,6 +132,16 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
       if (payload) onPointClick(payload as any);
     });
   }, [onPointClick]);
+
+  if (loading) {
+    return (
+      <div className="h-[280px] w-full animate-pulse rounded-2xl border border-border/30 bg-muted/50" aria-hidden="true" />
+    );
+  }
+
+  if (!safeData.length || !primary.length) {
+    return <EmptyState message={emptyMessage} />;
+  }
 
   return (
     <div
