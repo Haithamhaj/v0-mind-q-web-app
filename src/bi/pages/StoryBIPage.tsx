@@ -730,7 +730,7 @@ const StoryBIContent: React.FC = () => {
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
-  const { setFilter, filters, intelligence, runLayer2Assistant } = useBiData();
+  const { setFilter, filters, intelligence, runLayer2Assistant, knimeData } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
   const activeRun = correlations.run ?? 'run-latest';
@@ -2019,7 +2019,9 @@ const StoryBIContent: React.FC = () => {
 
   {biLayer3 ? <Layer3IntelligencePanel intelligence={intelligence} className="mt-6" /> : null}
 
-  {knimeBridge && intelligence?.knime ? <KnimeResultsPanel data={intelligence.knime} className="lg:w-3/4" /> : null}
+  {knimeBridge && intelligence?.knime ? (
+    <KnimeResultsPanel data={intelligence.knime} dataset={knimeData ?? undefined} className="lg:w-3/4" />
+  ) : null}
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricSummaries.map((summary) => {

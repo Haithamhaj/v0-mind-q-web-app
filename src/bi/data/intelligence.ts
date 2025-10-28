@@ -86,11 +86,22 @@ const knimeFileSchema = z.object({
   summary: z.string().optional(),
 });
 
+const knimeParquetSchema = z.object({
+  path: z.string().optional(),
+  rows: z.number().optional(),
+  columns: z.array(z.string()).optional(),
+  preview: z.array(z.record(z.string(), z.unknown())).optional(),
+  updated_at: z.string().optional(),
+  size_bytes: z.number().optional(),
+  error: z.string().optional(),
+});
+
 const knimeSummarySchema = z.object({
   run_id: z.string().optional(),
   mode: z.string().optional(),
   files: z.array(knimeFileSchema),
   metadata: z.record(z.unknown()).optional(),
+  data_parquet: knimeParquetSchema.optional(),
 });
 
 export const layer3IntelligenceSchema = z.object({
@@ -191,6 +202,18 @@ const sampleLayer3Intelligence: Layer3Intelligence = layer3IntelligenceSchema.pa
     ],
     metadata: {
       prompt: { mode: "auto" },
+    },
+    data_parquet: {
+      path: "artifacts/run-latest/phase_07_knime/data.parquet",
+      rows: 1200,
+      columns: ["order_id", "destination", "status"],
+      preview: [
+        { order_id: "ORD-001", destination: "Riyadh", status: "DELIVERED" },
+        { order_id: "ORD-002", destination: "Jeddah", status: "IN_TRANSIT" },
+        { order_id: "ORD-003", destination: "Riyadh", status: "DELIVERED" },
+      ],
+      updated_at: new Date().toISOString(),
+      size_bytes: 28_704,
     },
   },
 });

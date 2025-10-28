@@ -2,7 +2,15 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 
-import { fallbackCorrelations, fallbackDataset, fallbackDimensions, fallbackInsights, fallbackIntelligence, fallbackMetrics } from "./fallback";
+import {
+  fallbackCorrelations,
+  fallbackDataset,
+  fallbackDimensions,
+  fallbackInsights,
+  fallbackIntelligence,
+  fallbackKnimeData,
+  fallbackMetrics,
+} from "./fallback";
 import {
   BiDataContextValue,
   BiDatasetRow,
@@ -17,13 +25,17 @@ import {
   Layer2AgentResultContext,
   MetricSpec,
   KpiCatalog,
+  KnimeDataSnapshot,
 } from "./types";
 import { layer3IntelligenceSchema } from "./intelligence";
 import type { Layer3Intelligence } from "./intelligence";
 import { canonicalizeDimensionValue } from "../utils/normalize";
 
 type EndpointOverrides = Partial<
-  Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations" | "intelligence" | "catalog", string>
+  Record<
+    "metrics" | "dimensions" | "insights" | "dataset" | "correlations" | "intelligence" | "catalog" | "knime",
+    string
+  >
 >;
 
 type BiDataProviderProps = {
@@ -161,6 +173,7 @@ const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
   correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(DEFAULT_RUN)}&top=50`,
   intelligence: `${DEFAULT_BASE}/intelligence?run=${encodeURIComponent(DEFAULT_RUN)}`,
   catalog: `${DEFAULT_BASE}/kpi-catalog?run=${encodeURIComponent(DEFAULT_RUN)}`,
+  knime: `${DEFAULT_BASE}/knime-data?run=${encodeURIComponent(DEFAULT_RUN)}&limit=250`,
 });
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {
@@ -288,6 +301,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const [dataset, setDataset] = useState<BiDatasetRow[]>([]);
   const [correlations, setCorrelations] = useState<CorrelationCollection>(EMPTY_CORRELATIONS);
   const [intelligence, setIntelligence] = useState<Layer3Intelligence>(fallbackIntelligence);
+  const [knimeData, setKnimeData] = useState<KnimeDataSnapshot | null>(fallbackKnimeData);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | undefined>();
   const [filters, setFilters] = useState<Record<string, string[]>>({});
@@ -300,16 +314,25 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     const load = async () => {
       setLoading(true);
       try {
-        const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes, intelligenceRes, catalogRes] =
-          await Promise.all([
-            fetchJson<unknown>(mergedEndpoints.metrics, { metrics: [] }),
-            fetchJson<unknown>(mergedEndpoints.dimensions, EMPTY_DIMENSIONS),
-            fetchJson<unknown>(mergedEndpoints.insights, { insights: [] }),
-            fetchDataset(mergedEndpoints.dataset, []),
-            fetchJson<CorrelationCollection>(mergedEndpoints.correlations, EMPTY_CORRELATIONS),
-            fetchJson<unknown>(mergedEndpoints.intelligence, fallbackIntelligence),
-            fetchJson<KpiCatalog>(mergedEndpoints.catalog, {}),
-          ]);
+        const [
+          metricsRes,
+          dimensionsRes,
+          insightsRes,
+          datasetRes,
+          correlationsRes,
+          intelligenceRes,
+          catalogRes,
+          knimeRes,
+        ] = await Promise.all([
+          fetchJson<unknown>(mergedEndpoints.metrics, { metrics: [] }),
+          fetchJson<unknown>(mergedEndpoints.dimensions, EMPTY_DIMENSIONS),
+          fetchJson<unknown>(mergedEndpoints.insights, { insights: [] }),
+          fetchDataset(mergedEndpoints.dataset, []),
+          fetchJson<CorrelationCollection>(mergedEndpoints.correlations, EMPTY_CORRELATIONS),
+          fetchJson<unknown>(mergedEndpoints.intelligence, fallbackIntelligence),
+          fetchJson<KpiCatalog>(mergedEndpoints.catalog, {}),
+          fetchJson<KnimeDataSnapshot>(mergedEndpoints.knime, fallbackKnimeData),
+        ]);
 
         if (!active) return;
 
@@ -337,6 +360,9 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         setDimensions(resolvedDimensions);
         setInsights(resolvedInsights);
         setDataset(resolvedDataset);
+        const resolvedKnime =
+          knimeRes && Array.isArray(knimeRes.columns) ? knimeRes : (fallbackKnimeData as KnimeDataSnapshot);
+        setKnimeData(resolvedKnime);
         setCatalogMeta({
           metrics: metricsPayload.metadata,
           dimensions: dimensionsPayload.metadata,
@@ -401,6 +427,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     mergedEndpoints.correlations,
     mergedEndpoints.intelligence,
     mergedEndpoints.catalog,
+    mergedEndpoints.knime,
   ]);
 
   const runLayer2Assistant = useCallback(
@@ -470,6 +497,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       dataset,
       correlations,
       intelligence,
+      knimeData,
       loading,
       error,
       filters,
@@ -498,6 +526,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       dataset,
       correlations,
       intelligence,
+      knimeData,
       loading,
       error,
       filters,

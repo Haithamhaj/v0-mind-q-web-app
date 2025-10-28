@@ -1,4 +1,4 @@
-import type { BiDatasetRow, CorrelationCollection, DimensionsCatalog, Insight, MetricSpec } from "./types";
+import type { BiDatasetRow, CorrelationCollection, DimensionsCatalog, Insight, KnimeDataSnapshot, MetricSpec } from "./types";
 export { fallbackIntelligence } from "./intelligence";
 
 export const fallbackMetrics: MetricSpec[] = [
@@ -85,4 +85,16 @@ export const fallbackCorrelations: CorrelationCollection = {
   run: "fallback",
   artifacts_root: null,
   top: null,
+};
+
+export const fallbackKnimeData: KnimeDataSnapshot = {
+  run: "fallback",
+  columns: [],
+  rows: [],
+  total_rows: 0,
+  limit: 0,
+  offset: 0,
+  path: undefined,
+  updated_at: undefined,
+  size_bytes: undefined,
 };

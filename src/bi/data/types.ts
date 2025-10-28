@@ -194,6 +194,22 @@ export type KpiCatalog = {
   columns?: KpiCatalogColumnPolicy[];
 };
 
+export type KnimeDataRow = Record<string, unknown>;
+
+export type KnimeDataPreview = KnimeDataRow[];
+
+export type KnimeDataSnapshot = {
+  run: string;
+  columns: string[];
+  rows: KnimeDataPreview;
+  total_rows: number;
+  limit: number;
+  offset: number;
+  path?: string;
+  updated_at?: string;
+  size_bytes?: number;
+};
+
 export type CatalogMetadata = {
   metrics?: Record<string, unknown>;
   dimensions?: Record<string, unknown>;
@@ -251,6 +267,7 @@ export type BiDataContextValue = {
   dataset: BiDatasetRow[];
   correlations: CorrelationCollection;
   intelligence: Layer3Intelligence;
+  knimeData: KnimeDataSnapshot | null;
   loading: boolean;
   error?: string;
   filters: Record<string, string[]>;
