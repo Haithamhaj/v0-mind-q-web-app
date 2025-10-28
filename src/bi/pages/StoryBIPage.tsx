@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import {
   CorrelationListCard,
+  BiSection,
   FilterBar,
   Layer2InsightsPanel,
   Layer3IntelligencePanel,
@@ -113,12 +114,12 @@ type ChartSeriesMeta = {
 };
 
 const BREAKDOWN_SERIES_META: ChartSeriesMeta[] = [
-  { key: "orders", label: "الطلبات", kind: "count" },
-  { key: "share_pct", label: "الحصة %", kind: "percentage" },
-  { key: "delivered", label: "تم التسليم", kind: "count" },
-  { key: "out_for_delivery", label: "قيد التسليم", kind: "count" },
-  { key: "returned", label: "مرتجع", kind: "count" },
-  { key: "cod_total", label: "تحصيل COD", kind: "amount" },
+  { key: 'orders', label: 'الطلبات', kind: 'count' },
+  { key: 'share_pct', label: 'الحصة %', kind: 'percentage' },
+  { key: 'delivered', label: 'تم التسليم', kind: 'count' },
+  { key: 'out_for_delivery', label: 'قيد التسليم', kind: 'count' },
+  { key: 'returned', label: 'مرتجع', kind: 'count' },
+  { key: 'cod_total', label: 'تحصيل COD', kind: 'amount' },
 ];
 
 type AggregatedTrendStats = {
@@ -138,19 +139,19 @@ type TrendBuckets = {
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 const DEFAULT_CORRELATION_FILTER: CorrelationFilterState = {
-  kpi: "all",
-  domain: "all",
-  direction: "all",
+  kpi: 'all',
+  domain: 'all',
+  direction: 'all',
   persistentOnly: false,
 };
 
 const toNumber = (value: unknown): number | undefined => {
-  if (typeof value === "number" && Number.isFinite(value)) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
-  if (typeof value === "string") {
-    const cleaned = value.replace(/[^0-9.\-]+/g, "");
-    if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === "-.") {
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^0-9.\-]+/g, '');
+    if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') {
       return undefined;
     }
     const normalised = Number(cleaned);
@@ -171,7 +172,7 @@ const ensureDate = (value: unknown): Date | undefined => {
     const parsed = new Date(timestamp);
     return Number.isNaN(parsed.getTime()) ? undefined : parsed;
   }
-  if (typeof value === "string" && value.trim().length) {
+  if (typeof value === 'string' && value.trim().length) {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? undefined : parsed;
   }
@@ -186,7 +187,7 @@ const hasChartData = (chart?: RawMetricsChart | null): chart is RawMetricsChart 
   return yKeys.some((key) =>
     chart.data.some((row) => {
       const value = (row as Record<string, unknown>)[key];
-      return typeof value === "number" && !Number.isNaN(value);
+      return typeof value === 'number' && !Number.isNaN(value);
     }),
   );
 };
@@ -211,46 +212,46 @@ const buildBreakdownChart = (breakdown: RawMetricsBreakdown): RawMetricsChart | 
   const data = breakdown.values.map((value) => {
     const record = value as Record<string, unknown>;
     const row: Record<string, string | number> = {
-      breakdown: typeof value.value === "string" && value.value.length ? value.value : "غير معروف",
+      breakdown: typeof value.value === 'string' && value.value.length ? value.value : 'غير معروف',
     };
 
-  activeSeries.forEach((meta) => {
-    const numeric = toNumber(record[meta.key]);
-    if (numeric !== undefined) {
-      if (meta.kind === "count") {
-        row[meta.label] = Math.round(numeric);
-      } else {
-        row[meta.label] = Number(numeric.toFixed(2));
+    activeSeries.forEach((meta) => {
+      const numeric = toNumber(record[meta.key]);
+      if (numeric !== undefined) {
+        if (meta.kind === 'count') {
+          row[meta.label] = Math.round(numeric);
+        } else {
+          row[meta.label] = Number(numeric.toFixed(2));
+        }
       }
-    }
-  });
+    });
 
     return row;
   });
 
-  const primarySeries = activeSeries.filter((meta) => meta.kind !== "percentage");
-  const percentageSeries = activeSeries.filter((meta) => meta.kind === "percentage");
+  const primarySeries = activeSeries.filter((meta) => meta.kind !== 'percentage');
+  const percentageSeries = activeSeries.filter((meta) => meta.kind === 'percentage');
 
   if (!primarySeries.length && !percentageSeries.length) {
     return undefined;
   }
 
-  let type: RawMetricsChart["type"];
+  let type: RawMetricsChart['type'];
   let yKeys: string[];
   let secondaryKeys: string[] | undefined;
 
   if (primarySeries.length && percentageSeries.length) {
-    type = "combo";
+    type = 'combo';
     yKeys = primarySeries.map((meta) => meta.label);
     secondaryKeys = percentageSeries.map((meta) => meta.label);
   } else if (primarySeries.length > 1) {
-    type = "bar";
+    type = 'bar';
     yKeys = primarySeries.map((meta) => meta.label);
   } else if (primarySeries.length === 1) {
-    type = "bar";
+    type = 'bar';
     yKeys = [primarySeries[0].label];
   } else {
-    type = "line";
+    type = 'line';
     yKeys = percentageSeries.map((meta) => meta.label);
   }
 
@@ -262,7 +263,7 @@ const buildBreakdownChart = (breakdown: RawMetricsBreakdown): RawMetricsChart | 
     title: breakdown.label,
     type,
     data,
-    x: "breakdown",
+    x: 'breakdown',
     y: yKeys,
     secondary_y: secondaryKeys,
   };
@@ -273,8 +274,8 @@ const aggregateTrendBuckets = (rows: Record<string, unknown>[]): TrendBuckets =>
   const weekday = new Map<number, AggregatedTrendStats>();
   const hour = new Map<number, AggregatedTrendStats>();
 
-  const dailyFormatter = new Intl.DateTimeFormat("ar-SA", { month: "short", day: "numeric" });
-  const weekdayFormatter = new Intl.DateTimeFormat("ar-SA", { weekday: "long" });
+  const dailyFormatter = new Intl.DateTimeFormat('ar-SA', { month: 'short', day: 'numeric' });
+  const weekdayFormatter = new Intl.DateTimeFormat('ar-SA', { weekday: 'long' });
 
   const getNumber = (record: Record<string, unknown>, candidates: string[]): number => {
     for (const candidate of candidates) {
@@ -775,131 +776,209 @@ const StoryBIContent: React.FC = () => {
 
   const tabs = useMemo(() => buildTabs(metrics, categoricalNames), [metrics, categoricalNames]);
 
-  const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? 'narrative');
+  const [activeTab, setActiveTab] = useState<string>(tabs[0]?.id ?? "narrative");
   const [selectedKpi, setSelectedKpi] = useState<string | null>(tabs[0]?.metricId ?? metrics[0]?.id ?? null);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [canvasNarrative, setCanvasNarrative] = useState('اختر مؤشراً أو اطرح سؤالاً لبدء السرد.');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'مرحباً! اختر بطاقة مؤشر، افتح إحدى الرؤى، أو اطلب تفصيلاً معيناً.' },
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
+  const [canvasNarrative, setCanvasNarrative] = useState(
+    translate("اختر أحد مؤشرات الأداء لاستعراض التحليل التصوري هنا."),
+  );
+  const [correlationFilterState, setCorrelationFilterState] = useState<CorrelationFilterState>(DEFAULT_CORRELATION_FILTER);
   const [firstChartLogged, setFirstChartLogged] = useState(false);
-  const [rawMetrics, setRawMetrics] = useState<RawMetricsSummary | null>(null);
-  const [rawMetricsLoading, setRawMetricsLoading] = useState<boolean>(true);
-  const [rawMetricsError, setRawMetricsError] = useState<string | null>(null);
-  const [rawLlmMessages, setRawLlmMessages] = useState<RawChatMessage[]>([
-    { role: 'assistant', content: 'أهلاً! أنا مساعد الأرقام الخام. اسألني عن هذه المؤشرات كما هي في الشيت الأصلي.' },
-  ]);
-  const [rawLlmInput, setRawLlmInput] = useState('');
-  const [rawLlmLoading, setRawLlmLoading] = useState(false);
-  const [rawLlmError, setRawLlmError] = useState<string | null>(null);
-  const [layer1AssistantMessages, setLayer1AssistantMessages] = useState<Layer1ChatMessage[]>([
-    { role: 'assistant', content: 'مرحباً! أستطيع مساعدتك في شرح الحقول أو ضبط الفلاتر. جرّب: "فلتر الوجهة على جدة".' },
-  ]);
-  const [layer1AssistantInput, setLayer1AssistantInput] = useState('');
+  const [layer1AssistantInput, setLayer1AssistantInput] = useState("");
   const [layer1AssistantLoading, setLayer1AssistantLoading] = useState(false);
+  const [layer1AssistantMessages, setLayer1AssistantMessages] = useState<Layer1ChatMessage[]>([]);
   const [layer1AssistantChart, setLayer1AssistantChart] = useState<Layer1AssistantChartState>(null);
   const [layer1PendingRecommendation, setLayer1PendingRecommendation] = useState<Layer1AgentChartRecommendation | null>(null);
-  useEffect(() => {
-    if (!layer1PendingRecommendation) {
-      setLayer1AssistantChart(null);
-      return;
-    }
-    const chartState = buildLayer1AssistantChartState(layer1PendingRecommendation, dataset, metrics, dimensions);
-    setLayer1AssistantChart(chartState);
-  }, [layer1PendingRecommendation, dataset, metrics, dimensions]);
-  const breakdowns = useMemo(() => rawMetrics?.breakdowns ?? [], [rawMetrics]);
-  const [correlationFilterState, setCorrelationFilterState] = useState<CorrelationFilterState>(DEFAULT_CORRELATION_FILTER);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [rawMetrics, setRawMetrics] = useState<RawMetricsSummary | null>(null);
+  const [rawMetricsLoading, setRawMetricsLoading] = useState(false);
+  const [rawMetricsError, setRawMetricsError] = useState<string | null>(null);
+  const [rawLlmMessages, setRawLlmMessages] = useState<ChatMessage[]>([]);
+  const [rawLlmInput, setRawLlmInput] = useState("");
+  const [rawLlmLoading, setRawLlmLoading] = useState(false);
+  const [rawLlmError, setRawLlmError] = useState<string | null>(null);
   const [correlationExplanations, setCorrelationExplanations] = useState<Record<string, BiCorrelationExplanation | undefined>>({});
   const [correlationExplainingKey, setCorrelationExplainingKey] = useState<string | null>(null);
   const [correlationError, setCorrelationError] = useState<string | null>(null);
 
-  const determineDriverDomain = useCallback((item: CorrelationPair): string | null => {
-    if (item.driver_domain) {
-      return item.driver_domain;
-    }
-    if (item.kpi_feature) {
-      if (item.kpi_feature === item.feature_a) {
-        return item.feature_b_domain ?? item.feature_a_domain ?? null;
-      }
-      if (item.kpi_feature === item.feature_b) {
-        return item.feature_a_domain ?? item.feature_b_domain ?? null;
-      }
-    }
-    return item.feature_b_domain ?? item.feature_a_domain ?? null;
-  }, []);
+  const trends = rawMetrics?.trends;
+  const breakdowns = rawMetrics?.breakdowns ?? [];
+  const rawCorrelationData: CorrelationCollection = rawMetrics?.correlations ?? correlations;
+  const rawNumericHighlights = rawCorrelationData.numeric.slice(0, 4);
+  const rawDatetimeHighlights = rawCorrelationData.datetime.slice(0, 4);
+  const rawBusinessGroups = rawCorrelationData.business ?? {
+    numeric_numeric: [],
+    numeric_categorical: [],
+    categorical_categorical: [],
+  };
+  const rawBusinessNumeric = rawBusinessGroups.numeric_numeric.slice(0, 4) as CorrelationPair[];
+  const rawBusinessNumericCategorical = rawBusinessGroups.numeric_categorical.slice(0, 4) as CorrelationPair[];
+  const rawBusinessCategorical = rawBusinessGroups.categorical_categorical.slice(0, 4) as CorrelationPair[];
 
-  const determineDirection = useCallback((item: CorrelationPair): "improves" | "worsens" | "neutral" => {
-    if (item.effect_direction === "improves" || item.effect_direction === "worsens") {
-      return item.effect_direction;
-    }
-    if (typeof item.correlation === "number") {
-      if (item.correlation < 0) {
-        return "worsens";
-      }
-      if (item.correlation > 0) {
-        return "improves";
-      }
-    }
-    return "neutral";
-  }, []);
+  const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
+  const fallbackTrends = useMemo(() => buildTrendFallback(dataset as Record<string, unknown>[]), [dataset]);
+  const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
+  const weekdayTrendChart = hasChartData(trends?.weekday) ? trends!.weekday : fallbackTrends.weekday;
+  const hourTrendChart = hasChartData(trends?.hour_of_day) ? trends!.hour_of_day : fallbackTrends.hour_of_day;
+  const hasAnyTrendChart = Boolean(dailyTrendChart || weekdayTrendChart || hourTrendChart);
 
-  const allCorrelationItems = useMemo(() => {
-    const items: CorrelationPair[] = [];
-    if (Array.isArray(correlations.numeric)) {
-      items.push(...correlations.numeric);
-    }
-    if (Array.isArray(correlations.datetime)) {
-      items.push(...correlations.datetime);
-    }
-    if (correlations.business) {
-      if (Array.isArray(correlations.business.numeric_numeric)) {
-        items.push(...correlations.business.numeric_numeric);
-      }
-      if (Array.isArray(correlations.business.numeric_categorical)) {
-        items.push(...correlations.business.numeric_categorical);
-      }
-      if (Array.isArray(correlations.business.categorical_categorical)) {
-        items.push(...correlations.business.categorical_categorical);
-      }
-    }
-    return items;
-  }, [correlations]);
+  const computeBreakdownColumns = (values: RawMetricsBreakdownValue[]) => {
+    const columns: { key: keyof RawMetricsBreakdownValue; label: string; render: (value: RawMetricsBreakdownValue[keyof RawMetricsBreakdownValue]) => string }[] = [
+      { key: "orders", label: translate("الطلبات"), render: (value) => formatInteger(value as number | null) },
+      { key: "share_pct", label: translate("الحصة%"), render: (value) => formatPercent(value as number | null) },
+      { key: "delivered", label: translate("تم التسليم"), render: (value) => formatInteger(value as number | null) },
+      { key: "out_for_delivery", label: translate("قيد التسليم"), render: (value) => formatInteger(value as number | null) },
+      { key: "returned", label: translate("مرتجع"), render: (value) => formatInteger(value as number | null) },
+      { key: "cod_total", label: translate("تحصيل COD"), render: (value) => formatCurrency(value as number | null) },
+    ];
+
+    return columns.filter((column) =>
+      values.some((entry) => {
+        const raw = entry[column.key];
+        if (raw === null || raw === undefined) {
+          return false;
+        }
+        if (typeof raw === "number") {
+          return raw !== 0;
+        }
+        return true;
+      }),
+    );
+  };
+
+  const businessCorrelationGroups = correlations.business ?? {
+    numeric_numeric: [],
+    numeric_categorical: [],
+    categorical_categorical: [],
+  };
+
+  const allCorrelationPairs = useMemo(() => {
+    const pairs: CorrelationPair[] = [];
+    pairs.push(...correlations.numeric);
+    pairs.push(...correlations.datetime);
+    pairs.push(...businessCorrelationGroups.numeric_numeric.map((item) => item as unknown as CorrelationPair));
+    pairs.push(...businessCorrelationGroups.numeric_categorical.map((item) => item as unknown as CorrelationPair));
+    pairs.push(...businessCorrelationGroups.categorical_categorical.map((item) => item as unknown as CorrelationPair));
+    return pairs;
+  }, [correlations, businessCorrelationGroups]);
+
+  const extractKpiKey = (item: CorrelationPair): string | null => {
+    if (item.kpi_tag) return item.kpi_tag;
+    if (item.kpi_feature) return item.kpi_feature;
+    if (item.kpi_label) return item.kpi_label;
+    return null;
+  };
 
   const correlationKpiOptions = useMemo(() => {
-    const entries = new Map<string, string>();
-    allCorrelationItems.forEach((item) => {
-      const key = item.kpi_tag ?? item.kpi_label;
-      if (!key) {
+    const map = new Map<string, string>();
+    allCorrelationPairs.forEach((item) => {
+      const key = extractKpiKey(item);
+      if (!key || map.has(key)) {
         return;
       }
-      const label = item.kpi_label ?? key;
-      entries.set(key, label);
+      map.set(key, item.kpi_label ?? item.kpi_tag ?? item.kpi_feature ?? key);
     });
-    return Array.from(entries.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-  }, [allCorrelationItems]);
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+  }, [allCorrelationPairs]);
 
   const correlationDomainOptions = useMemo(() => {
     const domains = new Set<string>();
-    allCorrelationItems.forEach((item) => {
-      const domain = determineDriverDomain(item);
-      if (domain) {
-        domains.add(domain);
-      }
+    allCorrelationPairs.forEach((item) => {
+      [item.driver_domain, item.feature_a_domain, item.feature_b_domain]
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .forEach((value) => domains.add(value));
     });
-    return Array.from(domains.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  }, [allCorrelationItems, determineDriverDomain]);
+    return Array.from(domains).sort((a, b) => a.localeCompare(b));
+  }, [allCorrelationPairs]);
 
   const directionOptions = useMemo(
     () => [
-      { value: "all", label: "كل الاتجاهات" },
-      { value: "improves", label: "يرتبط بتحسّن KPI" },
-      { value: "worsens", label: "يرتبط بتدهور KPI" },
+      { value: "all", label: translate("كل الاتجاهات") },
+      { value: "positive", label: translate("ارتباط موجب") },
+      { value: "negative", label: translate("ارتباط سالب") },
     ],
-    [],
+    [translate],
+  );
+
+  const correlationMatchesFilters = useCallback(
+    (item: CorrelationPair) => {
+      if (correlationFilterState.kpi !== "all") {
+        const key = extractKpiKey(item);
+        if (!key || key !== correlationFilterState.kpi) {
+          return false;
+        }
+      }
+
+      if (correlationFilterState.domain !== "all") {
+        const target = correlationFilterState.domain.toLowerCase();
+        const domainValues = [item.driver_domain, item.feature_a_domain, item.feature_b_domain]
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => value.toLowerCase());
+        if (!domainValues.some((value) => value.includes(target))) {
+          return false;
+        }
+      }
+
+      if (correlationFilterState.direction === "positive" && typeof item.correlation === "number" && item.correlation < 0) {
+        return false;
+      }
+
+      if (correlationFilterState.direction === "negative" && typeof item.correlation === "number" && item.correlation > 0) {
+        return false;
+      }
+
+      if (correlationFilterState.persistentOnly && !item.is_persistent) {
+        return false;
+      }
+
+      return true;
+    },
+    [correlationFilterState],
+  );
+
+  const sortByMagnitude = useCallback((items: CorrelationPair[]) => {
+    return items
+      .slice()
+      .sort(
+        (a, b) =>
+          (Math.abs(b.correlation ?? b.abs_correlation ?? 0) || 0) - (Math.abs(a.correlation ?? a.abs_correlation ?? 0) || 0),
+      );
+  }, []);
+
+  const numericHighlights = useMemo(
+    () => sortByMagnitude(correlations.numeric.filter(correlationMatchesFilters)),
+    [correlations, correlationMatchesFilters, sortByMagnitude],
+  );
+
+  const datetimeHighlights = useMemo(
+    () => sortByMagnitude(correlations.datetime.filter(correlationMatchesFilters)),
+    [correlations, correlationMatchesFilters, sortByMagnitude],
+  );
+
+  const businessNumericHighlights = useMemo(
+    () =>
+      sortByMagnitude(
+        (businessCorrelationGroups.numeric_numeric as unknown as CorrelationPair[]).filter(correlationMatchesFilters),
+      ),
+    [businessCorrelationGroups, correlationMatchesFilters, sortByMagnitude],
+  );
+
+  const businessNumericCategoricalHighlights = useMemo(
+    () =>
+      sortByMagnitude(
+        (businessCorrelationGroups.numeric_categorical as unknown as CorrelationPair[]).filter(correlationMatchesFilters),
+      ),
+    [businessCorrelationGroups, correlationMatchesFilters, sortByMagnitude],
+  );
+
+  const businessCategoricalHighlights = useMemo(
+    () =>
+      sortByMagnitude(
+        (businessCorrelationGroups.categorical_categorical as unknown as CorrelationPair[]).filter(correlationMatchesFilters),
+      ),
+    [businessCorrelationGroups, correlationMatchesFilters, sortByMagnitude],
   );
 
   const isCorrelationFilterActive = useMemo(
@@ -911,198 +990,80 @@ const StoryBIContent: React.FC = () => {
     [correlationFilterState],
   );
 
+  const resetCorrelationFilters = useCallback(() => {
+    setCorrelationFilterState(DEFAULT_CORRELATION_FILTER);
+  }, []);
+
   const handleCorrelationFilterChange = useCallback(
-    (key: keyof CorrelationFilterState, value: string) => {
-      setCorrelationFilterState((prev) => ({ ...prev, [key]: value }));
+    (field: keyof CorrelationFilterState, value: string) => {
+      setCorrelationFilterState((previous) => ({ ...previous, [field]: value }));
     },
     [],
   );
 
   const handleCorrelationPersistenceToggle = useCallback((checked: boolean) => {
-    setCorrelationFilterState((prev) => ({ ...prev, persistentOnly: checked }));
+    setCorrelationFilterState((previous) => ({ ...previous, persistentOnly: Boolean(checked) }));
   }, []);
-
-  const resetCorrelationFilters = useCallback(() => {
-    setCorrelationFilterState(DEFAULT_CORRELATION_FILTER);
-  }, []);
-
-  const applyCorrelationFilters = useCallback(
-    (items: CorrelationPair[]) =>
-      items.filter((item) => {
-        const kpiValue = item.kpi_tag ?? item.kpi_label ?? "";
-        if (correlationFilterState.kpi !== "all" && kpiValue !== correlationFilterState.kpi) {
-          return false;
-        }
-        const direction = determineDirection(item);
-        if (correlationFilterState.direction !== "all" && direction !== correlationFilterState.direction) {
-          return false;
-        }
-        if (correlationFilterState.persistentOnly && !item.is_persistent) {
-          return false;
-        }
-        const domain = determineDriverDomain(item);
-        if (correlationFilterState.domain !== "all" && domain !== correlationFilterState.domain) {
-          return false;
-        }
-        return true;
-      }),
-    [correlationFilterState, determineDirection, determineDriverDomain],
-  );
-
-  const numericHighlights = useMemo(
-    () => applyCorrelationFilters(correlations.numeric ?? []).slice(0, 6),
-    [correlations.numeric, applyCorrelationFilters],
-  );
-  const datetimeHighlights = useMemo(
-    () => applyCorrelationFilters(correlations.datetime ?? []).slice(0, 6),
-    [correlations.datetime, applyCorrelationFilters],
-  );
-  const businessGroups = useMemo(
-    () =>
-      correlations.business ?? {
-        numeric_numeric: [],
-        numeric_categorical: [],
-        categorical_categorical: [],
-      },
-    [correlations.business],
-  );
-  const businessNumericHighlights = useMemo(
-    () => applyCorrelationFilters(businessGroups.numeric_numeric ?? []).slice(0, 6),
-    [businessGroups.numeric_numeric, applyCorrelationFilters],
-  );
-  const businessNumericCategoricalHighlights = useMemo(
-    () => applyCorrelationFilters(businessGroups.numeric_categorical ?? []).slice(0, 6),
-    [businessGroups.numeric_categorical, applyCorrelationFilters],
-  );
-  const businessCategoricalHighlights = useMemo(
-    () => applyCorrelationFilters(businessGroups.categorical_categorical ?? []).slice(0, 6),
-    [businessGroups.categorical_categorical, applyCorrelationFilters],
-  );
 
   const handleExplainCorrelation = useCallback(
     async (item: CorrelationPair) => {
+      if (!item.feature_a || !item.feature_b) {
+        return;
+      }
       const key = correlationPairKey(item);
-      setCorrelationError(null);
       setCorrelationExplainingKey(key);
+      setCorrelationError(null);
       try {
         const response = await api.explainBiCorrelation({
-          run: activeRun,
+          run: correlations.run ?? rawMetrics?.run ?? "run-latest",
           feature_a: item.feature_a,
           feature_b: item.feature_b,
-          kind: item.kind ?? 'numeric',
-          language,
-          use_llm: true,
+          kind: item.kind ?? "numeric",
+          language: language === "ar" ? "ar" : "en",
         });
-        if (!response?.explanation) {
-          throw new Error('لم يتم استلام شرح من الخادم');
-        }
-        setCorrelationExplanations((prev) => ({ ...prev, [key]: response.explanation }));
+        setCorrelationExplanations((previous) => ({ ...previous, [key]: response.explanation }));
       } catch (error) {
-        console.error('[story-bi] correlation explain failed', error);
-        setCorrelationError(error instanceof Error ? error.message : 'تعذر توليد الشرح');
+        console.error("[story-bi] failed to explain correlation", error);
+        setCorrelationError(error instanceof Error ? error.message : translate("تعذر توليد الشرح."));
+        setCorrelationExplanations((previous) => ({ ...previous, [key]: undefined }));
       } finally {
         setCorrelationExplainingKey(null);
       }
     },
-    [activeRun, language],
+    [correlations.run, language, rawMetrics?.run, translate],
   );
 
+  const biSummary = useMemo(() => {
+    const items: string[] = [];
+    const orders = rawMetrics?.totals?.orders;
+    if (typeof orders === "number") {
+      items.push(translate("عدد الطلبات الخام: {value}", { value: formatInteger(orders) }));
+    }
 
-  const biSummary = rawMetrics
-    ? (() => {
-        const summary: string[] = [];
-        const ordersText = rawMetrics.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("بانتظار البيانات");
-        summary.push(
-          translate("Orders processed: {value}", {
-            value: ordersText,
-          }),
-        );
+    const codTotal = rawMetrics?.totals?.cod_total;
+    if (typeof codTotal === "number") {
+      items.push(translate("تحصيل الدفع عند الاستلام: {value}", { value: formatCurrency(codTotal) }));
+    }
 
-        const codShare = rawMetrics.totals?.orders_cod_share_pct != null
-          ? formatPercent(rawMetrics.totals.orders_cod_share_pct)
-          : translate("بانتظار البيانات");
-        summary.push(
-          translate("Cash-on-delivery share: {value}", {
-            value: codShare,
-          }),
-        );
+    const codShare = rawMetrics?.totals?.orders_cod_share_pct;
+    if (typeof codShare === "number") {
+      items.push(translate("حصة COD من الطلبات: {value}", { value: formatPercent(codShare) }));
+    }
 
-        const codCollected = rawMetrics.totals?.cod_total != null ? formatCurrency(rawMetrics.totals.cod_total) : translate("بانتظار البيانات");
-        summary.push(
-          translate("Total COD collected: {value}", {
-            value: codCollected,
-          }),
-        );
+    if (activeFilters.length) {
+      items.push(translate("عدد المرشحات النشطة: {count}", { count: activeFilters.length }));
+    }
 
-        if (rawMetrics.order_date_range) {
-          const coverageRange = `${rawMetrics.order_date_range.min ?? translate("بانتظار البيانات")} → ${rawMetrics.order_date_range.max ?? translate("بانتظار البيانات")}`;
-          summary.push(
-            translate("Data coverage: {range}", {
-              range: coverageRange,
-            }),
-          );
-        }
+    if (insightStats?.insights_total) {
+      items.push(translate("إجمالي الرؤى المنشورة: {value}", { value: formatInteger(insightStats.insights_total) }));
+    }
 
-        if (breakdowns?.length) {
-          const topBreakdown = breakdowns[0];
-          const topValue = topBreakdown?.values?.[0];
-          const label = topBreakdown?.label ?? translate("Not specified");
-          const recordedOrders = toNumber(topValue?.orders);
-          const formattedOrders = recordedOrders != null ? formatInteger(recordedOrders) : translate("بانتظار البيانات");
-          summary.push(
-            translate("Top breakdown {label} contributes {value} orders.", {
-              label,
-              value: formattedOrders,
-            }),
-          );
-        }
+    if (!items.length) {
+      items.push(translate("بانتظار تحميل البيانات من مراحل التشغيل."));
+    }
 
-        return summary;
-      })()
-    : null;
-  const trends = rawMetrics?.trends;
-  const rawCorrelationData: CorrelationCollection = rawMetrics?.correlations ?? correlations;
-  const rawNumericHighlights = rawCorrelationData.numeric.slice(0, 4);
-  const rawDatetimeHighlights = rawCorrelationData.datetime.slice(0, 4);
-  const rawBusinessGroups = rawCorrelationData.business ?? {
-    numeric_numeric: [],
-    numeric_categorical: [],
-    categorical_categorical: [],
-  };
-  const rawBusinessNumeric = rawBusinessGroups.numeric_numeric.slice(0, 4);
-  const rawBusinessNumericCategorical = rawBusinessGroups.numeric_categorical.slice(0, 4);
-  const rawBusinessCategorical = rawBusinessGroups.categorical_categorical.slice(0, 4);
-const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdowns), [breakdowns]);
-  const fallbackTrends = useMemo(() => buildTrendFallback(dataset as Record<string, unknown>[]), [dataset]);
-  const dailyTrendChart = hasChartData(trends?.daily) ? trends!.daily : fallbackTrends.daily;
-  const weekdayTrendChart = hasChartData(trends?.weekday) ? trends!.weekday : fallbackTrends.weekday;
-  const hourTrendChart = hasChartData(trends?.hour_of_day) ? trends!.hour_of_day : fallbackTrends.hour_of_day;
-  
-  const hasAnyTrendChart = Boolean(dailyTrendChart || weekdayTrendChart || hourTrendChart);
-  const computeBreakdownColumns = (values: RawMetricsBreakdownValue[]) => {
-    const columns: { key: keyof RawMetricsBreakdownValue; label: string; render: (value: RawMetricsBreakdownValue[keyof RawMetricsBreakdownValue]) => string }[] =
-      [
-        { key: 'orders', label: 'الطلبات', render: (value) => formatInteger(value as number | null) },
-        { key: 'share_pct', label: 'الحصة%', render: (value) => formatPercent(value as number | null) },
-        { key: 'delivered', label: 'تم التسليم', render: (value) => formatInteger(value as number | null) },
-        { key: 'out_for_delivery', label: 'قيد التسليم', render: (value) => formatInteger(value as number | null) },
-        { key: 'returned', label: 'مرتجع', render: (value) => formatInteger(value as number | null) },
-        { key: 'cod_total', label: 'تحصيل COD', render: (value) => formatCurrency(value as number | null) },
-      ];
-
-    return columns.filter((column) =>
-      values.some((entry) => {
-        const raw = entry[column.key];
-        if (raw === null || raw === undefined) {
-          return false;
-        }
-        if (typeof raw === 'number') {
-          return raw !== 0;
-        }
-        return true;
-      }),
-    );
-  };
+    return items;
+  }, [rawMetrics, activeFilters, insightStats, translate]);
 
   useEffect(() => {
     if (typeof performance !== 'undefined') {
@@ -1116,6 +1077,17 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
       setSelectedKpi(tabs[0].metricId ?? metrics[0]?.id ?? null);
     }
   }, [tabs, activeTab, metrics]);
+
+  useEffect(() => {
+    if (!layer1PendingRecommendation) {
+      return;
+    }
+    const chartState = buildLayer1AssistantChartState(layer1PendingRecommendation, dataset, metrics, dimensions);
+    if (chartState) {
+      setLayer1AssistantChart(chartState);
+    }
+    setLayer1PendingRecommendation(null);
+  }, [layer1PendingRecommendation, dataset, metrics, dimensions]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1500,243 +1472,275 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
   );
 
   return (
-    <div className="flex flex-col gap-6 pb-32" dir="rtl">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-start">{translate("لوحة التحليلات السردية")}</h1>
-          <HelpTrigger
-            topicId="bi.overview"
-            aria-label={translate("شرح مساحة العمل للذكاء البياني")}
-            variant="link"
-            buildTopic={() => {
-              const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("بانتظار البيانات")
-              const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("بانتظار البيانات")
-              const coverage = rawMetrics?.order_date_range
-                ? `${rawMetrics.order_date_range.min ?? translate("بانتظار البيانات")} → ${rawMetrics.order_date_range.max ?? translate("بانتظار البيانات")}`
-                : translate("بانتظار البيانات")
-              return {
-                title: translate("مساحة العمل السردية"),
-                summary: translate(
-                  "تجمع هذه الصفحة مؤشرات الأداء، والرؤى، والارتباطات الناتجة عن المراحل 08 إلى 10 في قصة تشغيلية واحدة.",
-                ),
-                detailItems: [
-                  translate("الطلبات المعالجة: {value}", { value: orders }),
-                  translate("حصة الدفع عند الاستلام: {value}", { value: codShare }),
-                  translate("نطاق البيانات الزمنية: {range}", { range: coverage }),
-                ],
-                sources: [
-                  {
-                    label: translate("مخرجات المرحلة 08"),
-                    description: translate("تحليل البيانات الاستكشافي الذي يكشف عن المحركات والع anomalies."),
-                  },
-                  {
-                    label: translate("بوابة المرحلة 09"),
-                    description: translate("نتائج التحقق التشغيلي وقياس الالتزام بمؤشرات SLA."),
-                  },
-                  {
-                    label: translate("مخازن المرحلة 10"),
-                    description: translate("المقاييس المعتمدة التي تغذي اللوحات والرسوم البيانية."),
-                  },
-                ],
-                suggestedQuestions: [
-                  translate("ما هو البُعد الذي يفسر تغير المؤشر الأخير؟"),
-                  translate("أي الشذوذات يجب مناقشتها مع فريق العمليات؟"),
-                ],
-                onAsk: () => {
-                  setActiveTab('narrative')
-                  setSidePanelOpen(true)
-                },
-              }
-            }}
-          >
-            {translate("شرح")}
-          </HelpTrigger>
-        </div>
-        <p className="text-sm text-muted-foreground text-start">
-          {translate("تعتمد اللوحة على رؤى المرحلة 08، والتحقق التشغيلي في المرحلة 09، وقواعد البيانات الدلالية في المرحلة 10. يتم اكتشاف الأعمدة تلقائياً دون مخطط ثابت.")}
-        </p>
-        {insightStats && (
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>إجمالي الرؤى: {formatStatCount(insightStats.insights_total)}</span>
-            {Object.entries(insightStats.by_type ?? {}).map(([type, count]) => (
-              <span key={type} className="rounded-full bg-muted px-2 py-0.5">
-                {insightTypeLabel(type)}: {formatStatCount(typeof count === 'number' ? count : Number(count ?? 0))}
+    <div className="flex flex-col gap-8 pb-40" dir="rtl">
+      <header className="rounded-3xl border border-border/50 bg-background/80 p-6 shadow-sm shadow-black/5 transition-all">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2 text-start">
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary/70">
+                {translate("مساحة ذكاء الأعمال")}
               </span>
-            ))}
-          </div>
-        )}
-      </header>
-
-      {biSummary?.length ? (
-        <Card className="border-border/40 bg-background/80 shadow-sm">
-          <CardHeader className="space-y-1">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="space-y-1">
-                <CardTitle className="text-sm font-semibold text-foreground">{translate("BI narrative overview")}</CardTitle>
-                <CardDescription>{translate("Assistant-ready summary of the current BI dataset and narratives.")}</CardDescription>
-              </div>
-              <HelpTrigger
-                topicId="bi.overview"
-                aria-label={translate("Explain the BI workspace")}
-                variant="link"
-                buildTopic={() => ({
-                  title: translate("Story-driven BI workspace"),
-                  summary: translate("This page blends curated KPIs, correlations, and AI narratives derived from phases 08-10."),
-                  detailItems: biSummary,
+              <h1 className="text-3xl font-bold leading-tight tracking-tight text-foreground sm:text-4xl">
+                {translate("لوحة التحليلات السردية")}
+              </h1>
+              <p className="text-sm text-muted-foreground sm:text-base">
+                {translate(
+                  "منصة تنفيذية تجمع بين مؤشرات الأداء، وتحليل الأبعاد، والإجابات المعززة بالذكاء الاصطناعي لتقديم قصة تشغيلية متكاملة.",
+                )}
+              </p>
+            </div>
+            <HelpTrigger
+              topicId="bi.overview"
+              aria-label={translate("شرح مساحة العمل للذكاء البياني")}
+              variant="link"
+              buildTopic={() => {
+                const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("بانتظار البيانات");
+                const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("بانتظار البيانات");
+                const coverage = rawMetrics?.order_date_range
+                  ? `${rawMetrics.order_date_range.min ?? translate("بانتظار البيانات")} → ${rawMetrics.order_date_range.max ?? translate("بانتظار البيانات")}`
+                  : translate("بانتظار البيانات");
+                return {
+                  title: translate("مساحة العمل السردية"),
+                  summary: translate(
+                    "تجمع هذه الصفحة مؤشرات الأداء، والرؤى، والارتباطات الناتجة عن المراحل 08 إلى 10 في قصة تشغيلية واحدة.",
+                  ),
+                  detailItems: [
+                    translate("الطلبات المعالجة: {value}", { value: orders }),
+                    translate("حصة الدفع عند الاستلام: {value}", { value: codShare }),
+                    translate("نطاق البيانات الزمنية: {range}", { range: coverage }),
+                  ],
                   sources: [
                     {
-                      label: translate("Phase 08 insights"),
-                      description: translate("Profiling and exploratory analysis feeding this BI story."),
+                      label: translate("مخرجات المرحلة 08"),
+                      description: translate("تحليل البيانات الاستكشافي الذي يكشف عن المحركات والشذوذ."),
                     },
                     {
-                      label: translate("Phase 09 validation"),
-                      description: translate("SLA and business validation gates referenced in the KPIs."),
+                      label: translate("بوابة المرحلة 09"),
+                      description: translate("نتائج التحقق التشغيلي وقياس الالتزام بمؤشرات SLA."),
                     },
                     {
-                      label: translate("Phase 10 semantic marts"),
-                      description: translate("Published metrics powering the charts and narratives."),
+                      label: translate("مخازن المرحلة 10"),
+                      description: translate("المقاييس المعتمدة التي تغذي اللوحات والرسوم البيانية."),
                     },
                   ],
                   suggestedQuestions: [
-                    translate("Which dimension is driving the latest KPI swings?"),
-                    translate("What anomalies should I discuss with operations?"),
+                    translate("ما هو البُعد الذي يفسر تغير المؤشر الأخير؟"),
+                    translate("أي الشذوذات يجب مناقشتها مع فريق العمليات؟"),
                   ],
                   onAsk: () => {
-                    setActiveTab('narrative');
+                    setActiveTab("narrative");
                     setSidePanelOpen(true);
                   },
-                })}
-              >
-                {translate("Open help center")}
-              </HelpTrigger>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              {biSummary.map((entry, index) => (
-                <li key={`bi-summary-${index}`} className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
-                  <span>{entry}</span>
-                </li>
+                };
+              }}
+            >
+              {translate("مركز المساعدة")}
+            </HelpTrigger>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {translate(
+              "تعتمد المنصة على رؤى المرحلة 08، والتحقق التشغيلي في المرحلة 09، وقواعد البيانات الدلالية في المرحلة 10. يتم اكتشاف الأعمدة تلقائياً دون مخطط ثابت.",
+            )}
+          </p>
+          {insightStats ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+              <span className="rounded-full bg-muted/40 px-3 py-1">
+                {translate("إجمالي الرؤى")}: {formatStatCount(insightStats.insights_total)}
+              </span>
+              {Object.entries(insightStats.by_type ?? {}).map(([type, count]) => (
+                <span key={type} className="rounded-full bg-muted/30 px-3 py-1">
+                  {insightTypeLabel(type)}: {formatStatCount(typeof count === "number" ? count : Number(count ?? 0))}
+                </span>
               ))}
-            </ul>
-          </CardContent>
-        </Card>
+            </div>
+          ) : null}
+        </div>
+      </header>
+
+      {biSummary?.length ? (
+        <BiSection
+          id="bi-story-summary"
+          subtitle={translate("ملخص تنفيذي")}
+          title={translate("أبرز ما يجب معرفته الآن")}
+          description={translate("مختصر مهيأ لمساعد الذكاء يرصد أهم الملاحظات والقيم الحالية.")}
+          actions={
+            <HelpTrigger
+              topicId="bi.overview"
+              aria-label={translate("Explain the BI workspace")}
+              variant="link"
+              buildTopic={() => ({
+                title: translate("Story-driven BI workspace"),
+                summary: translate("This page blends curated KPIs, correlations, and AI narratives derived from phases 08-10."),
+                detailItems: biSummary,
+                sources: [
+                  {
+                    label: translate("Phase 08 insights"),
+                    description: translate("Profiling and exploratory analysis feeding this BI story."),
+                  },
+                  {
+                    label: translate("Phase 09 validation"),
+                    description: translate("SLA and business validation gates referenced in the KPIs."),
+                  },
+                  {
+                    label: translate("Phase 10 semantic marts"),
+                    description: translate("Published metrics powering the charts and narratives."),
+                  },
+                ],
+                suggestedQuestions: [
+                  translate("Which dimension is driving the latest KPI swings?"),
+                  translate("What anomalies should I discuss with operations?"),
+                ],
+                onAsk: () => {
+                  setActiveTab("narrative");
+                  setSidePanelOpen(true);
+                },
+              })}
+            >
+              {translate("Open help center")}
+            </HelpTrigger>
+          }
+          contentClassName="space-y-3"
+        >
+          <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {biSummary.map((entry, index) => (
+              <li key={`bi-summary-${index}`} className="flex items-start gap-3">
+                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                <span>{entry}</span>
+              </li>
+            ))}
+          </ul>
+        </BiSection>
       ) : null}
 
-            {rawMetricsLoading ? (
-        <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm text-muted-foreground shadow-sm">
-          جارٍ تحميل الإحصاءات الخام...
-        </div>
+      {rawMetricsLoading ? (
+        <BiSection
+          id="raw-layer"
+          subtitle={translate("المرحلة 08")}
+          title={translate("جاري تحميل البيانات الخام")}
+          description={translate("نُحضِّر اللقطات الأولية والارتباطات قبل الانتقال إلى التحليلات المتقدمة.")}
+          contentClassName="text-sm text-muted-foreground"
+        >
+          {translate("جارٍ تحميل الإحصاءات الخام...")}
+        </BiSection>
       ) : rawMetricsError ? (
-        <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive-foreground shadow-sm">
-          تعذّر تحميل الإحصاءات الخام: {rawMetricsError}
-        </div>
+        <BiSection
+          id="raw-layer-error"
+          subtitle={translate("المرحلة 08")}
+          title={translate("تعذّر تحميل البيانات الخام")}
+          description={translate("حاول تحديث الصفحة أو تأكد من نجاح تشغيل المرحلة في بيئة المعالجة.")}
+          className="border-destructive/40 bg-destructive/10"
+          contentClassName="text-sm text-destructive-foreground"
+        >
+          {translate("تعذّر تحميل الإحصاءات الخام: {message}", { message: rawMetricsError })}
+        </BiSection>
       ) : rawMetrics ? (
-        <section className="flex flex-col gap-6 rounded-2xl border border-border/60 bg-background/70 p-4 shadow-sm">
+        <BiSection
+          id="raw-overview"
+          subtitle={translate("المرحلة 08")}
+          title={translate("المنظر الخام قبل المعالجة")}
+          description={translate("لقطة سريعة للبيانات كما استُوردت، مع أبرز المؤشرات والارتباطات الأولية.")}
+          contentClassName="flex flex-col gap-6"
+        >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-border/40 bg-background/80 shadow-sm">
+            <Card className="border-border/40 bg-background/90 shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground">عدد الطلبات (RAW)</CardTitle>
-                <CardDescription>الأعداد مباشرة قبل أي معالجة</CardDescription>
+                <CardTitle className="text-base font-semibold text-foreground">{translate("عدد الطلبات (RAW)")}</CardTitle>
+                <CardDescription>{translate("القيم كما ظهرت في ملف المصدر")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-2xl font-bold text-foreground">{formatInteger(rawMetrics.totals.orders)}</p>
                 <p className="text-xs text-muted-foreground">
                   COD: {formatInteger(rawMetrics.totals.orders_cod)}
-                  {formatPercent(rawMetrics.totals.orders_cod_share_pct) !== '—' ? (
+                  {formatPercent(rawMetrics.totals.orders_cod_share_pct) !== "—" ? (
                     <span> ({formatPercent(rawMetrics.totals.orders_cod_share_pct)})</span>
                   ) : null}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-border/40 bg-background/80 shadow-sm">
+            <Card className="border-border/40 bg-background/90 shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground">تحصيل COD الخام</CardTitle>
-                <CardDescription>الإجمالي والمتوسط من الشيت الأصلي</CardDescription>
+                <CardTitle className="text-base font-semibold text-foreground">{translate("تحصيل COD الخام")}</CardTitle>
+                <CardDescription>{translate("الإجماليات والمتوسط من المصدر الأصلي")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-2xl font-bold text-foreground">{formatCurrency(rawMetrics.totals.cod_total)}</p>
-                <p className="text-xs text-muted-foreground">متوسط التذكرة: {formatCurrency(rawMetrics.totals.cod_average)}</p>
+                <p className="text-xs text-muted-foreground">{translate("متوسط التذكرة")}: {formatCurrency(rawMetrics.totals.cod_average)}</p>
                 <p className="text-xs text-muted-foreground">
-                  نطاق القيم: {formatCurrency(rawMetrics.totals.cod_min)} – {formatCurrency(rawMetrics.totals.cod_max)}
+                  {translate("نطاق القيم")}: {formatCurrency(rawMetrics.totals.cod_min)} – {formatCurrency(rawMetrics.totals.cod_max)}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-border/40 bg-background/80 shadow-sm">
+            <Card className="border-border/40 bg-background/90 shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground">القيمة الإجمالية الملتقطة</CardTitle>
-                <CardDescription>يشمل جميع طرق الدفع قبل أي معالجة</CardDescription>
+                <CardTitle className="text-base font-semibold text-foreground">{translate("القيمة الإجمالية الملتقطة")}</CardTitle>
+                <CardDescription>{translate("يشمل جميع طرق الدفع قبل أي معالجة")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-2xl font-bold text-foreground">{formatCurrency(rawMetrics.totals.amount_total)}</p>
-                <p className="text-xs text-muted-foreground">الطلبات غير COD: {formatInteger(rawMetrics.totals.orders_non_cod)}</p>
+                <p className="text-xs text-muted-foreground">{translate("الطلبات غير COD")}: {formatInteger(rawMetrics.totals.orders_non_cod)}</p>
               </CardContent>
             </Card>
 
-            <Card className="border-border/40 bg-background/80 shadow-sm">
+            <Card className="border-border/40 bg-background/90 shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground">نطاق البيانات الخام</CardTitle>
-                <CardDescription>يمثل ما بين أول وآخر تاريخ في الشيت</CardDescription>
+                <CardTitle className="text-base font-semibold text-foreground">{translate("نطاق البيانات الخام")}</CardTitle>
+                <CardDescription>{translate("أول وآخر تاريخ موثق في المصدر")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 <div>
-                  <span className="font-semibold text-foreground">من:</span>{' '}
-                  {rawMetrics.order_date_range?.min ?? 'غير متاح'}
+                  <span className="font-semibold text-foreground">{translate("من")}:</span>{" "}
+                  {rawMetrics.order_date_range?.min ?? translate("غير متاح")}
                 </div>
                 <div>
-                  <span className="font-semibold text-foreground">إلى:</span>{' '}
-                  {rawMetrics.order_date_range?.max ?? 'غير متاح'}
+                  <span className="font-semibold text-foreground">{translate("إلى")}:</span>{" "}
+                  {rawMetrics.order_date_range?.max ?? translate("غير متاح")}
                 </div>
                 <div className="text-xs">
-                  Run: <span className="font-mono text-foreground">{rawMetrics.run}</span>
-                  {rawMetrics.fallback_used ? <span className="ml-2 text-destructive">(استخدم مصدر بديل)</span> : null}
+                  run: <span className="font-mono text-foreground">{rawMetrics.run}</span>
+                  {rawMetrics.fallback_used ? <span className="ml-2 text-destructive">{translate("(استخدم مصدر بديل)")}</span> : null}
                 </div>
               </CardContent>
             </Card>
+
             <CorrelationListCard
-              title="روابط عددية (RAW)"
+              title={translate("روابط عددية (RAW)")}
               items={rawNumericHighlights}
               limit={4}
-              emptyMessage="لا توجد ارتباطات عددية في البيانات الخام."
+              emptyMessage={translate("لا توجد ارتباطات عددية في البيانات الخام.")}
             />
-
             <CorrelationListCard
-              title="روابط زمنية (RAW)"
+              title={translate("روابط زمنية (RAW)")}
               items={rawDatetimeHighlights}
               limit={4}
-              emptyMessage="لا توجد ارتباطات زمنية في البيانات الخام."
+              emptyMessage={translate("لا توجد ارتباطات زمنية في البيانات الخام.")}
             />
-
             <CorrelationListCard
-              title="روابط أعمال (RAW)"
+              title={translate("روابط أعمال (RAW)")}
               items={rawBusinessNumeric}
               limit={4}
-              emptyMessage="لا توجد روابط أعمال في البيانات الخام."
+              emptyMessage={translate("لا توجد روابط أعمال في البيانات الخام.")}
             />
-
             <CorrelationListCard
-              title="أثر الفئات على المقاييس (RAW)"
+              title={translate("أثر الفئات على المقاييس (RAW)")}
               items={rawBusinessNumericCategorical}
               limit={4}
-              emptyMessage="لا توجد روابط فئوية في البيانات الخام."
+              emptyMessage={translate("لا توجد روابط فئوية في البيانات الخام.")}
             />
             <CorrelationListCard
-              title="روابط الفئات (RAW)"
+              title={translate("روابط الفئات (RAW)")}
               items={rawBusinessCategorical}
               limit={4}
-              emptyMessage="لا توجد روابط فئات في البيانات الخام."
+              emptyMessage={translate("لا توجد روابط فئات في البيانات الخام.")}
             />
-
           </div>
 
           {hasAnyTrendChart ? (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {dailyTrendChart ? (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">الطلبات حسب اليوم</h3>
+                <div className="space-y-3 rounded-2xl border border-border/40 bg-background/70 p-4">
+                  <h3 className="text-sm font-semibold text-foreground">{translate("الطلبات حسب اليوم")}</h3>
                   <Layer1Chart
                     key={`daily-trend-${dailyTrendChart.data?.length || 0}`}
                     type={dailyTrendChart.type}
@@ -1744,41 +1748,43 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
                     x={dailyTrendChart.x}
                     y={dailyTrendChart.y}
                     secondaryY={dailyTrendChart.secondary_y}
-                    emptyMessage="لا توجد بيانات يومية."
+                    emptyMessage={translate("لا توجد بيانات يومية.")}
                     debugId="daily-trend"
                   />
                 </div>
               ) : null}
               {weekdayTrendChart ? (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">التوزيع حسب أيام الأسبوع</h3>
+                <div className="space-y-3 rounded-2xl border border-border/40 bg-background/70 p-4">
+                  <h3 className="text-sm font-semibold text-foreground">{translate("التوزيع حسب أيام الأسبوع")}</h3>
                   <Layer1Chart
                     type={weekdayTrendChart.type}
                     data={weekdayTrendChart.data}
                     x={weekdayTrendChart.x}
                     y={weekdayTrendChart.y}
                     secondaryY={weekdayTrendChart.secondary_y}
-                    emptyMessage="لا توجد بيانات أسبوعية."
+                    emptyMessage={translate("لا توجد بيانات أسبوعية.")}
                     debugId="weekday-trend"
                   />
                 </div>
               ) : null}
               {hourTrendChart ? (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">الطلبات حسب الساعة</h3>
+                <div className="space-y-3 rounded-2xl border border-border/40 bg-background/70 p-4">
+                  <h3 className="text-sm font-semibold text-foreground">{translate("الطلبات حسب الساعة")}</h3>
                   <Layer1Chart
                     type={hourTrendChart.type}
                     data={hourTrendChart.data}
                     x={hourTrendChart.x}
                     y={hourTrendChart.y}
                     secondaryY={hourTrendChart.secondary_y}
-                    emptyMessage="لا توجد بيانات زمنية."
+                    emptyMessage={translate("لا توجد بيانات زمنية.")}
                     debugId="hour-trend"
                   />
                 </div>
               ) : null}
             </div>
-          ) : null}\n{breakdowns.length ? (
+          ) : null}
+
+          {breakdowns.length ? (
             <div className="flex flex-col gap-4">
               {breakdowns.map((breakdown, index) => {
                 const columns = computeBreakdownColumns(breakdown.values);
@@ -1794,10 +1800,10 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
                   console.groupEnd();
                 }
                 return (
-                  <Card key={breakdownKey} className="border-border/40 bg-background/80 shadow-sm">
+                  <Card key={breakdownKey} className="border-border/40 bg-background/90 shadow-sm">
                     <CardHeader>
                       <CardTitle className="text-sm font-semibold text-foreground">{breakdown.label}</CardTitle>
-                      <CardDescription>أبرز القيم المتكررة ومؤشراتها الرئيسية</CardDescription>
+                      <CardDescription>{translate("أبرز القيم المتكررة ومؤشراتها الرئيسية")}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {resolvedBreakdownChart ? (
@@ -1807,19 +1813,19 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
                           x={resolvedBreakdownChart.x}
                           y={resolvedBreakdownChart.y}
                           secondaryY={resolvedBreakdownChart.secondary_y}
-                          emptyMessage="لا توجد بيانات كافية للرسم."
+                          emptyMessage={translate("لا توجد بيانات كافية للرسم.")}
                           debugId={`breakdown-${breakdownKey}`}
                         />
                       ) : (
                         <div className="rounded-xl border border-dashed border-border/40 p-6 text-sm text-muted-foreground">
-                          لا توجد بيانات كافية للرسم.
+                          {translate("لا توجد بيانات كافية للرسم.")}
                         </div>
                       )}
                       <div className="overflow-hidden rounded-xl border border-border/40">
                         <table className="w-full text-xs">
                           <thead className="bg-muted/30 text-muted-foreground">
                             <tr>
-                              <th className="px-3 py-2 text-start">القيمة</th>
+                              <th className="px-3 py-2 text-start">{translate("القيمة")}</th>
                               {columns.map((column) => (
                                 <th key={column.key} className="px-3 py-2 text-start">
                                   {column.label}
@@ -1847,15 +1853,15 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               })}
             </div>
           ) : (
-            <div className="rounded-2xl border border-border/60 bg-muted/10 p-4 text-sm text-muted-foreground">
-              لا توجد أبعاد قابلة للتحليل في هذا الشيت.
+            <div className="rounded-2xl border border-dashed border-border/50 bg-muted/10 p-4 text-sm text-muted-foreground">
+              {translate("لا توجد أبعاد قابلة للتحليل في هذا الشيت.")}
             </div>
           )}
 
-          <Card className="border-border/40 bg-background/80 shadow-sm">
+          <Card className="border-border/40 bg-background/90 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-sm font-semibold text-foreground">مساعد الأرقام الخام (LLM)</CardTitle>
-              <CardDescription>يجيب فقط عن الأسئلة المتعلقة بالمؤشرات أعلاه.</CardDescription>
+              <CardTitle className="text-sm font-semibold text-foreground">{translate("مساعد الأرقام الخام (LLM)")}</CardTitle>
+              <CardDescription>{translate("يجيب خصيصاً عن الأسئلة المتعلقة بالمؤشرات أعلاه.")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {rawLlmError ? (
@@ -1865,12 +1871,12 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
               ) : null}
               <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-border/40 bg-muted/10 p-3 text-xs">
                 {rawLlmMessages.map((message, index) => (
-                  <div key={`raw-llm-${index}`} className={`flex ${message.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                  <div key={`raw-llm-${index}`} className={`flex ${message.role === "user" ? "justify-start" : "justify-end"}`}>
                     <span
                       className={`inline-flex max-w-[75%] rounded-2xl px-3 py-2 ${
-                        message.role === 'user'
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-sky-500/10 text-sky-600 dark:text-sky-300'
+                        message.role === "user"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-sky-500/10 text-sky-600 dark:text-sky-300"
                       }`}
                     >
                       {message.content}
@@ -1882,25 +1888,25 @@ const fallbackBreakdownCharts = useMemo(() => buildBreakdownFallbackMap(breakdow
                 <textarea
                   value={rawLlmInput}
                   onChange={(event) => setRawLlmInput(event.target.value)}
-                  placeholder="اكتب سؤالك حول الأرقام الخام..."
+                  placeholder={translate("اكتب سؤالك حول الأرقام الخام...")}
                   className="h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-[11px] text-muted-foreground">
-                    هذا المساعد متخصص في هذه المرحلة فقط. للاستفسار عن مراحل أخرى استخدم الأقسام اللاحقة.
+                    {translate("هذا المساعد متخصص في هذه المرحلة فقط. للاستفسار عن مراحل أخرى استخدم الأقسام اللاحقة.")}
                   </p>
                   <button
                     type="submit"
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
                     disabled={rawLlmLoading}
                   >
-                    {rawLlmLoading ? 'جارٍ المعالجة...' : 'إرسال'}
+                    {rawLlmLoading ? translate("جارٍ المعالجة...") : translate("إرسال")}
                   </button>
                 </div>
               </form>
             </CardContent>
           </Card>
-        </section>
+        </BiSection>
       ) : null}
 
       <FilterBar />

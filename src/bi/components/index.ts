@@ -7,3 +7,4 @@ export { NarrativeFeed } from "./NarrativeFeed";
 export { CorrelationListCard, correlationPairKey } from "./CorrelationListCard";
 export { Layer2InsightsPanel } from "./layer2";
 export { Layer3IntelligencePanel, KnimeResultsPanel } from "./layer3";
+export { BiSection } from "./layout/BiSection";
