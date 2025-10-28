@@ -161,10 +161,44 @@ export type InsightStats = {
   by_type?: Record<string, number>;
 };
 
+export type KpiCatalogColumnPolicy = {
+  name: string;
+  classification?: string;
+  include_in_bi_feed?: boolean;
+  include_in_semantic?: boolean;
+  include_in_exports?: boolean;
+  tags?: string[];
+  description?: string;
+};
+
+export type KpiCatalogEntry = {
+  name: string;
+  expr?: string;
+  dtype?: string;
+  description?: string;
+  owner?: string;
+  business_goal?: string;
+  ml_usage?: string;
+  default_dimensions?: string[];
+  tags?: string[];
+  visibility?: string;
+  freshness_sla_hours?: number;
+  quality_notes?: string;
+  llm_prompt?: string;
+};
+
+export type KpiCatalog = {
+  version?: number;
+  thresholds?: Record<string, number>;
+  kpis?: KpiCatalogEntry[];
+  columns?: KpiCatalogColumnPolicy[];
+};
+
 export type CatalogMetadata = {
   metrics?: Record<string, unknown>;
   dimensions?: Record<string, unknown>;
   insights?: Record<string, unknown>;
+  kpiCatalog?: KpiCatalog;
 };
 
 export type Layer2AgentMessage = {

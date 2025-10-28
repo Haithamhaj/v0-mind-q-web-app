@@ -50,12 +50,23 @@ const aggregateValue = (values: number[], aggregator: string) => {
 const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
 
 export const SidePanel: React.FC<SidePanelProps> = ({ kpiId, open, onClose, dimension, onDimensionChange }) => {
-  const { metrics, dimensions } = useBiData();
+  const { metrics, dimensions, catalogMeta } = useBiData();
   const dataset = useFilteredDataset();
   const metric: MetricSpec | undefined = metrics.find((item) => item.id === kpiId);
   const categoricalDims = dimensions.categorical ?? [];
   const defaultDimension = categoricalDims[0]?.name;
   const [localDimension, setLocalDimension] = useState<string | undefined>(dimension ?? defaultDimension);
+  const normalizedKpiId = useMemo(() => {
+    if (!kpiId) return null;
+    return kpiId.startsWith("kpi_") ? kpiId.slice(4) : kpiId;
+  }, [kpiId]);
+  const catalogEntry = useMemo(() => {
+    if (!normalizedKpiId) {
+      return null;
+    }
+    const entries = catalogMeta.kpiCatalog?.kpis ?? [];
+    return entries.find((entry) => entry.name === normalizedKpiId) ?? null;
+  }, [catalogMeta.kpiCatalog, normalizedKpiId]);
 
   useEffect(() => {
     setLocalDimension(dimension ?? defaultDimension);
@@ -146,19 +157,46 @@ export const SidePanel: React.FC<SidePanelProps> = ({ kpiId, open, onClose, dime
     >
       <div className="flex items-start justify-between">
         <div>
-          <span className="text-xs text-muted-foreground">مؤشر حالي</span>
+          <span className="text-xs text-muted-foreground">???? ????</span>
           <h2 className="text-2xl font-semibold tracking-tight">{metric?.title ?? kpiId ?? "KPI"}</h2>
-          {latestValue !== null && <p className="text-sm text-muted-foreground">آخر قيمة: {latestValue.toLocaleString()}</p>}
+          {latestValue !== null && <p className="text-sm text-muted-foreground">??? ????: {latestValue.toLocaleString()}</p>}
+          {catalogEntry && (
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              {catalogEntry.owner && (
+                <div>
+                  <dt className="font-medium text-foreground">??????</dt>
+                  <dd className="truncate">{catalogEntry.owner}</dd>
+                </div>
+              )}
+              {catalogEntry.visibility && (
+                <div>
+                  <dt className="font-medium text-foreground">???? ???????</dt>
+                  <dd className="capitalize">{catalogEntry.visibility}</dd>
+                </div>
+              )}
+              {catalogEntry.business_goal && (
+                <div className="col-span-2">
+                  <dt className="font-medium text-foreground">?????? ??????</dt>
+                  <dd className="line-clamp-2">{catalogEntry.business_goal}</dd>
+                </div>
+              )}
+              {catalogEntry.ml_usage && (
+                <div className="col-span-2">
+                  <dt className="font-medium text-foreground">?????? ???? ????????</dt>
+                  <dd className="line-clamp-2">{catalogEntry.ml_usage}</dd>
+                </div>
+              )}
+            </dl>
+          )}
         </div>
         <button
           type="button"
           onClick={onClose}
           className="rounded-full border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted/50"
         >
-          إغلاق
+          ?????
         </button>
       </div>
-
       <section className="mt-6 space-y-4">
         <header className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-muted-foreground">الاتجاه الزمني</h3>
@@ -243,6 +281,35 @@ export const SidePanel: React.FC<SidePanelProps> = ({ kpiId, open, onClose, dime
           {!breakdownData.length && <span className="text-sm text-muted-foreground">لم يتم العثور على مساهمين.</span>}
         </div>
       </section>
+
+      {catalogEntry && (
+        <section className="mt-6 space-y-3">
+          <header className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-muted-foreground">????? ????????</h3>
+            {catalogEntry.freshness_sla_hours && (
+              <span className="text-xs text-muted-foreground">SLA {catalogEntry.freshness_sla_hours}h</span>
+            )}
+          </header>
+          <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">
+            {catalogEntry.default_dimensions?.length ? (
+              <p>
+                ????? ??????? ???????:{" "}
+                <span className="font-medium text-foreground">
+                  {catalogEntry.default_dimensions.join(", ")}
+                </span>
+              </p>
+            ) : null}
+            {catalogEntry.tags?.length ? (
+              <p>
+                ?????:{" "}
+                <span className="font-medium text-foreground">{catalogEntry.tags.join(", ")}</span>
+              </p>
+            ) : null}
+            {catalogEntry.quality_notes && <p>{catalogEntry.quality_notes}</p>}
+          </div>
+        </section>
+      )}
+
     </aside>
   );
 };

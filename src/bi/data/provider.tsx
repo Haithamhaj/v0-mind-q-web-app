@@ -16,13 +16,14 @@ import {
   Layer2AgentResult,
   Layer2AgentResultContext,
   MetricSpec,
+  KpiCatalog,
 } from "./types";
 import { layer3IntelligenceSchema } from "./intelligence";
 import type { Layer3Intelligence } from "./intelligence";
 import { canonicalizeDimensionValue } from "../utils/normalize";
 
 type EndpointOverrides = Partial<
-  Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations" | "intelligence", string>
+  Record<"metrics" | "dimensions" | "insights" | "dataset" | "correlations" | "intelligence" | "catalog", string>
 >;
 
 type BiDataProviderProps = {
@@ -159,6 +160,7 @@ const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
   dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(DEFAULT_RUN)}`,
   correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(DEFAULT_RUN)}&top=50`,
   intelligence: `${DEFAULT_BASE}/intelligence?run=${encodeURIComponent(DEFAULT_RUN)}`,
+  catalog: `${DEFAULT_BASE}/kpi-catalog?run=${encodeURIComponent(DEFAULT_RUN)}`,
 });
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {
@@ -298,14 +300,16 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     const load = async () => {
       setLoading(true);
       try {
-        const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes, intelligenceRes] = await Promise.all([
-          fetchJson<unknown>(mergedEndpoints.metrics, { metrics: [] }),
-          fetchJson<unknown>(mergedEndpoints.dimensions, EMPTY_DIMENSIONS),
-          fetchJson<unknown>(mergedEndpoints.insights, { insights: [] }),
-          fetchDataset(mergedEndpoints.dataset, []),
-          fetchJson<CorrelationCollection>(mergedEndpoints.correlations, EMPTY_CORRELATIONS),
-          fetchJson<unknown>(mergedEndpoints.intelligence, fallbackIntelligence),
-        ]);
+        const [metricsRes, dimensionsRes, insightsRes, datasetRes, correlationsRes, intelligenceRes, catalogRes] =
+          await Promise.all([
+            fetchJson<unknown>(mergedEndpoints.metrics, { metrics: [] }),
+            fetchJson<unknown>(mergedEndpoints.dimensions, EMPTY_DIMENSIONS),
+            fetchJson<unknown>(mergedEndpoints.insights, { insights: [] }),
+            fetchDataset(mergedEndpoints.dataset, []),
+            fetchJson<CorrelationCollection>(mergedEndpoints.correlations, EMPTY_CORRELATIONS),
+            fetchJson<unknown>(mergedEndpoints.intelligence, fallbackIntelligence),
+            fetchJson<KpiCatalog>(mergedEndpoints.catalog, {}),
+          ]);
 
         if (!active) return;
 
@@ -337,6 +341,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
           metrics: metricsPayload.metadata,
           dimensions: dimensionsPayload.metadata,
           insights: insightsPayload.metadata,
+          kpiCatalog: catalogRes,
         });
         setInsightStats(insightsPayload.stats);
         const resolvedCorrelations =
@@ -395,6 +400,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     mergedEndpoints.dataset,
     mergedEndpoints.correlations,
     mergedEndpoints.intelligence,
+    mergedEndpoints.catalog,
   ]);
 
   const runLayer2Assistant = useCallback(
