@@ -7,22 +7,26 @@
    - Network:      http://192.168.11.201:3000
 
  ✓ Starting...
- ✓ Ready in 4s
+ ✓ Ready in 8.9s
  ○ Compiling / ...
- ✓ Compiled / in 1635ms (949 modules)
- GET / 200 in 2416ms
+ ✓ Compiled / in 6.9s (963 modules)
+ GET / 200 in 174ms
  ○ Compiling /pipeline ...
- ✓ Compiled /pipeline in 1081ms (1016 modules)
- GET /pipeline 200 in 1228ms
+ ✓ Compiled /pipeline in 1854ms (1030 modules)
+ GET /pipeline 200 in 2109ms
+ GET /pipeline 200 in 88ms
  ○ Compiling /api/uploads ...
- ✓ Compiled /api/uploads in 614ms (1037 modules)
- POST /api/uploads 200 in 1379ms
+ ✓ Compiled /api/uploads in 1846ms (1037 modules)
+ POST /api/uploads 200 in 3428ms
+ ✓ Compiled in 530ms (473 modules)
+ GET /pipeline 200 in 89ms
  ○ Compiling /_error ...
- ✓ Compiled /_error in 6.7s (1367 modules)
- GET /pipeline 200 in 5238ms
- GET /pipeline 200 in 29ms
- GET /pipeline 200 in 22ms
+ ✓ Compiled /_error in 1389ms (1353 modules)
+ ✓ Compiled in 522ms (722 modules)
+ GET /pipeline 200 in 1331ms
+ GET /pipeline 200 in 35ms
+ GET /pipeline 200 in 19ms
  ○ Compiling /bi ...
- ✓ Compiled /bi in 14.2s (2626 modules)
- GET /bi 200 in 16809ms
- GET /bi 200 in 268ms
+ ✓ Compiled /bi in 7s (2626 modules)
+ GET /bi 200 in 8733ms
+ GET /bi 200 in 1004ms

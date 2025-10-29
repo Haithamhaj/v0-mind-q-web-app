@@ -1,4 +1,4 @@
-(node:9512) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(node:21428) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251029065651/phases/07/knime-bridge [Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://127.0.0.1:9000/v1/runs/run-20251029084347/phases/07/knime-bridge [Error: socket hang up] { code: 'ECONNRESET' }
 [Error: socket hang up] { code: 'ECONNRESET' }
