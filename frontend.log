@@ -1,0 +1,27 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.2.4
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.11.201:3000
+
+ ✓ Starting...
+ ✓ Ready in 4s
+ ○ Compiling / ...
+ ✓ Compiled / in 1635ms (949 modules)
+ GET / 200 in 2416ms
+ ○ Compiling /pipeline ...
+ ✓ Compiled /pipeline in 1081ms (1016 modules)
+ GET /pipeline 200 in 1228ms
+ ○ Compiling /api/uploads ...
+ ✓ Compiled /api/uploads in 614ms (1037 modules)
+ POST /api/uploads 200 in 1379ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 6.7s (1367 modules)
+ GET /pipeline 200 in 5238ms
+ GET /pipeline 200 in 29ms
+ GET /pipeline 200 in 22ms
+ ○ Compiling /bi ...
+ ✓ Compiled /bi in 14.2s (2626 modules)
+ GET /bi 200 in 16809ms
