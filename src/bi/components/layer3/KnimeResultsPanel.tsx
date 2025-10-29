@@ -91,6 +91,14 @@ export const KnimeResultsPanel: React.FC<KnimeResultsPanelProps> = ({ data, data
     export_count: toNumber(data.report_summary?.export_count),
     coverage: toNumber(data.report_summary?.coverage),
   };
+  const extras = report?.extras ?? null;
+  const clusterSummary = extras?.clusters?.summary ?? [];
+  const clusterFeatures = extras?.clusters?.features ?? [];
+  const anomalyRows = extras?.anomalies?.rows ?? [];
+  const anomalyColumns = extras?.anomalies?.columns ?? [];
+  const correlationPairs = extras?.correlations?.pairs ?? [];
+  const forecast = extras?.forecast ?? null;
+
   const totalRows = dataset?.total_rows ?? data.data_parquet?.rows ?? null;
   const parquetSize = dataset?.size_bytes ?? data.data_parquet?.size_bytes;
   const parquetUpdatedAt = dataset?.updated_at ?? data.data_parquet?.updated_at;
@@ -346,6 +354,137 @@ export const KnimeResultsPanel: React.FC<KnimeResultsPanelProps> = ({ data, data
             </p>
           )}
         </div>
+
+        {clusterSummary.length ? (
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-foreground">شرائح KMeans المقترحة</h4>
+            <p className="text-[11px] text-muted-foreground">
+              تم حساب التجزئة اعتماداً على الأعمدة: {clusterFeatures.join(", ")}
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-border/40 bg-background/40">
+              <table className="min-w-full table-auto border-separate border-spacing-y-1 text-xs">
+                <thead>
+                  <tr>
+                    <th className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">القطعة</th>
+                    <th className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">عدد السجلات</th>
+                    <th className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">الحصة</th>
+                    {clusterSummary.some((item) => item.avg_lead_time_hours !== undefined) ? (
+                      <th className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">متوسط زمن التسليم</th>
+                    ) : null}
+                    {clusterSummary.some((item) => item.avg_cod_amount !== undefined) ? (
+                      <th className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">متوسط COD</th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {clusterSummary.map((row) => (
+                    <tr key={`cluster-${row.cluster}`} className="rounded-lg">
+                      <td className="rounded-lg bg-background/70 px-3 py-2 text-foreground">#{row.cluster + 1}</td>
+                      <td className="rounded-lg bg-background/70 px-3 py-2 text-foreground">{formatNumber(row.records)}</td>
+                      <td className="rounded-lg bg-background/70 px-3 py-2 text-foreground">{formatPercent(row.share)}</td>
+                      {clusterSummary.some((item) => item.avg_lead_time_hours !== undefined) ? (
+                        <td className="rounded-lg bg-background/70 px-3 py-2 text-foreground">
+                          {row.avg_lead_time_hours !== undefined ? formatDecimal(row.avg_lead_time_hours) : "-"}
+                        </td>
+                      ) : null}
+                      {clusterSummary.some((item) => item.avg_cod_amount !== undefined) ? (
+                        <td className="rounded-lg bg-background/70 px-3 py-2 text-foreground">
+                          {row.avg_cod_amount !== undefined ? formatDecimal(row.avg_cod_amount) : "-"}
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        {anomalyRows.length ? (
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-foreground">الشحنات الشاذّة المرصودة</h4>
+            <p className="text-[11px] text-muted-foreground">
+              أدنى قيم score تعبّر عن أعلى احتمالية شذوذ بناءً على خصائص الطلب.
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-border/40 bg-background/40">
+              <table className="min-w-full table-auto border-separate border-spacing-y-1 text-xs">
+                <thead>
+                  <tr>
+                    {anomalyColumns.map((column) => (
+                      <th key={`anomaly-col-${column}`} className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">
+                        {column}
+                      </th>
+                    ))}
+                    <th className="rounded-lg bg-muted px-3 py-2 text-start font-semibold text-muted-foreground">score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {anomalyRows.slice(0, 10).map((row, index) => (
+                    <tr key={`anomaly-${index}`} className="rounded-lg">
+                      {anomalyColumns.map((column) => (
+                        <td key={`anomaly-${index}-${column}`} className="rounded-lg bg-background/70 px-3 py-2 text-foreground">
+                          {row?.[column] !== undefined && row?.[column] !== null ? String(row[column]) : "-"}
+                        </td>
+                      ))}
+                      <td className="rounded-lg bg-background/70 px-3 py-2 text-foreground">
+                        {row?.score !== undefined && typeof row.score === "number" ? formatDecimal(row.score) : row?.score ?? "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+
+        {correlationPairs.length ? (
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-foreground">أقوى الارتباطات</h4>
+            <ul className="space-y-1 text-[11px] text-muted-foreground">
+              {correlationPairs.slice(0, 10).map((pair, index) => (
+                <li key={`corr-${index}`} className="rounded-lg border border-border/40 bg-background/40 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-foreground">
+                    <span>
+                      {pair.feature_a} ↔ {pair.feature_b}
+                    </span>
+                    <span>{formatDecimal(pair.correlation)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {forecast && forecast.predictions.length ? (
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-foreground">توقعات الطلب القصيرة</h4>
+            <p className="text-[11px] text-muted-foreground">
+              تم استخدام متوسط آخر {forecast.window_used ?? forecast.history.length} أيام لتقدير {forecast.metric}.
+            </p>
+            <div className="flex flex-col gap-2 rounded-xl border border-border/40 bg-background/40 p-3 text-[11px] text-muted-foreground">
+              <div>
+                <span className="font-semibold text-foreground">التاريخ الأخيرة:</span>
+                <ul className="mt-1 space-y-1">
+                  {forecast.history.slice(-5).map((point) => (
+                    <li key={`hist-${point.timestamp}`}>
+                      {point.timestamp}: {formatNumber(point.value)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <span className="font-semibold text-foreground">التوقعات:</span>
+                <ul className="mt-1 space-y-1">
+                  {forecast.predictions.map((point) => (
+                    <li key={`pred-${point.timestamp}`}>
+                      {point.timestamp}: {formatNumber(point.value)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <h4 className="text-sm font-semibold text-foreground">ملفات الملف الشخصي</h4>

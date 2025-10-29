@@ -116,4 +116,5 @@ export const fallbackKnimeReport: KnimeReport = {
   exports: [],
   notes: null,
   profile_files: [],
+  extras: null,
 };

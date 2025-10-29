@@ -266,6 +266,51 @@ export type KnimeProfileFile = {
   updated_at?: string | null;
 };
 
+export type KnimeClusterSummary = {
+  cluster: number;
+  records: number;
+  share: number;
+  avg_lead_time_hours?: number;
+  avg_cod_amount?: number;
+  avg_weight_kg?: number;
+  avg_amount?: number;
+};
+
+export type KnimeAnomalyRow = Record<string, unknown>;
+
+export type KnimeCorrelationPair = {
+  feature_a: string;
+  feature_b: string;
+  correlation: number;
+  abs_correlation: number;
+};
+
+export type KnimeForecastPoint = {
+  timestamp: string;
+  value: number;
+};
+
+export type KnimeReportExtras = {
+  clusters?: {
+    features: string[];
+    summary: KnimeClusterSummary[];
+  };
+  anomalies?: {
+    columns: string[];
+    identifier_columns?: string[];
+    rows: KnimeAnomalyRow[];
+  };
+  correlations?: {
+    pairs: KnimeCorrelationPair[];
+  };
+  forecast?: {
+    metric: string;
+    history: KnimeForecastPoint[];
+    predictions: KnimeForecastPoint[];
+    window_used?: number;
+  };
+};
+
 export type KnimeReport = {
   dq_report: KnimeDQReport;
   dq_coverage?: KnimeDQCoverage | null;
@@ -284,6 +329,7 @@ export type KnimeReport = {
     source?: string | null;
   } | null;
   profile_files: KnimeProfileFile[];
+  extras?: KnimeReportExtras | null;
 };
 
 export type CatalogMetadata = {
