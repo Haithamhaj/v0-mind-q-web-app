@@ -1,4 +1,12 @@
-import type { BiDatasetRow, CorrelationCollection, DimensionsCatalog, Insight, KnimeDataSnapshot, MetricSpec } from "./types";
+import type {
+  BiDatasetRow,
+  CorrelationCollection,
+  DimensionsCatalog,
+  Insight,
+  KnimeDataSnapshot,
+  KnimeReport,
+  MetricSpec,
+} from "./types";
 export { fallbackIntelligence } from "./intelligence";
 
 export const fallbackMetrics: MetricSpec[] = [
@@ -97,4 +105,15 @@ export const fallbackKnimeData: KnimeDataSnapshot = {
   path: undefined,
   updated_at: undefined,
   size_bytes: undefined,
+};
+
+export const fallbackKnimeReport: KnimeReport = {
+  dq_report: { results: [], source: null },
+  dq_coverage: null,
+  insights: { items: [], meta: null, source: null },
+  layer2_candidate: null,
+  bridge_summary: null,
+  exports: [],
+  notes: null,
+  profile_files: [],
 };

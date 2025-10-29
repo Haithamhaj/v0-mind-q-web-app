@@ -210,6 +210,82 @@ export type KnimeDataSnapshot = {
   size_bytes?: number;
 };
 
+export type KnimeDQResult = {
+  id?: string;
+  status?: string;
+  passed?: boolean;
+  title?: string;
+  severity?: string;
+  scope?: string;
+  entity?: string;
+  fail_rate?: number;
+  evaluated_rows?: number;
+  failed_rows?: number;
+  notes?: string;
+  sample_failures_path?: string;
+};
+
+export type KnimeDQReport = {
+  results: KnimeDQResult[];
+  source?: string | null;
+};
+
+export type KnimeDQCoverage = {
+  summary?: Record<string, number | string>;
+  source?: string | null;
+};
+
+export type KnimeInsightRecord = {
+  headline?: string;
+  [key: string]: unknown;
+};
+
+export type KnimeInsightsPayload = {
+  items: KnimeInsightRecord[];
+  meta?: Record<string, unknown> | null;
+  source?: string | null;
+};
+
+export type KnimeExport = {
+  path: string;
+  relative_path?: string;
+  format?: string;
+  domain?: string | null;
+  table?: string | null;
+  version?: string | null;
+  size_bytes?: number | null;
+  updated_at?: string | null;
+  rows?: number | null;
+  columns?: string[] | null;
+};
+
+export type KnimeProfileFile = {
+  name: string;
+  path: string;
+  size_bytes?: number | null;
+  updated_at?: string | null;
+};
+
+export type KnimeReport = {
+  dq_report: KnimeDQReport;
+  dq_coverage?: KnimeDQCoverage | null;
+  insights: KnimeInsightsPayload;
+  layer2_candidate?: {
+    source?: string | null;
+    payload?: Record<string, unknown> | null;
+  } | null;
+  bridge_summary?: {
+    source?: string | null;
+    payload?: Record<string, unknown> | null;
+  } | null;
+  exports: KnimeExport[];
+  notes?: {
+    run_summary?: string | null;
+    source?: string | null;
+  } | null;
+  profile_files: KnimeProfileFile[];
+};
+
 export type CatalogMetadata = {
   metrics?: Record<string, unknown>;
   dimensions?: Record<string, unknown>;
@@ -268,6 +344,7 @@ export type BiDataContextValue = {
   correlations: CorrelationCollection;
   intelligence: Layer3Intelligence;
   knimeData: KnimeDataSnapshot | null;
+  knimeReport: KnimeReport | null;
   loading: boolean;
   error?: string;
   filters: Record<string, string[]>;

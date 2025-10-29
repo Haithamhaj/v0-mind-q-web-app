@@ -25,3 +25,4 @@
  ○ Compiling /bi ...
  ✓ Compiled /bi in 14.2s (2626 modules)
  GET /bi 200 in 16809ms
+ GET /bi 200 in 268ms

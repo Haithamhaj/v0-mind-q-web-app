@@ -96,12 +96,23 @@ const knimeParquetSchema = z.object({
   error: z.string().optional(),
 });
 
+const knimeReportSummarySchema = z
+  .object({
+    dq_rules: z.number().optional(),
+    dq_failed: z.number().optional(),
+    insight_count: z.number().optional(),
+    export_count: z.number().optional(),
+    coverage: z.number().optional(),
+  })
+  .optional();
+
 const knimeSummarySchema = z.object({
   run_id: z.string().optional(),
   mode: z.string().optional(),
   files: z.array(knimeFileSchema),
   metadata: z.record(z.unknown()).optional(),
   data_parquet: knimeParquetSchema.optional(),
+  report_summary: knimeReportSummarySchema,
 });
 
 export const layer3IntelligenceSchema = z.object({
@@ -214,6 +225,13 @@ const sampleLayer3Intelligence: Layer3Intelligence = layer3IntelligenceSchema.pa
       ],
       updated_at: new Date().toISOString(),
       size_bytes: 28_704,
+    },
+    report_summary: {
+      dq_rules: 12,
+      dq_failed: 2,
+      insight_count: 4,
+      export_count: 3,
+      coverage: 0.92,
     },
   },
 });
