@@ -17,6 +17,7 @@ export type ChartExportConfig = {
   columns: ChartExportColumn[];
   rows: Record<string, unknown>[];
   disabled?: boolean;
+  label?: string;
 };
 
 const escapeCsvValue = (value: unknown): string => {
@@ -30,7 +31,13 @@ const escapeCsvValue = (value: unknown): string => {
   return text;
 };
 
-export const ChartExport: React.FC<ChartExportConfig> = ({ fileName = "layer1-export", columns, rows, disabled }) => {
+export const ChartExport: React.FC<ChartExportConfig> = ({
+  fileName = "layer1-export",
+  columns,
+  rows,
+  disabled,
+  label = "Export",
+}) => {
   const handleExport = useCallback(() => {
     if (!rows?.length || !columns?.length) {
       return;
@@ -73,7 +80,7 @@ export const ChartExport: React.FC<ChartExportConfig> = ({ fileName = "layer1-ex
       disabled={disabled || !rows?.length}
     >
       <Download className="h-3.5 w-3.5" />
-      <span className="hidden sm:inline">Export</span>
+      <span className="hidden sm:inline">{label}</span>
     </Button>
   );
 };

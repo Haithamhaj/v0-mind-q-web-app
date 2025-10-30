@@ -1,3 +1,4 @@
+import type { PipelineRunInfo } from "@/lib/api";
 import type { Layer3Intelligence } from "./intelligence";
 
 export type MetricSpec = {
@@ -383,6 +384,12 @@ export type Layer2AgentResult = {
 };
 
 export type BiDataContextValue = {
+  runId: string;
+  setRunId: (runId: string) => void;
+  availableRuns: PipelineRunInfo[];
+  runsLoading: boolean;
+  runsError?: string;
+  refreshRuns: () => Promise<void>;
   metrics: MetricSpec[];
   dimensions: DimensionsCatalog;
   insights: Insight[];

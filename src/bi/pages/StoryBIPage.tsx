@@ -45,6 +45,7 @@ import type {
 } from '../data';
 import { api, type BiCorrelationExplanation } from '@/lib/api';
 import { featureFlags } from '../../../config/features';
+import { Loader2, RefreshCcw } from 'lucide-react';
 
 type ChatMessage = {
   role: 'user' | 'assistant';
@@ -730,28 +731,48 @@ const StoryBIContent: React.FC = () => {
   const metrics = useBiMetrics();
   const dimensions = useBiDimensions();
   const dataset = useFilteredDataset();
-  const { setFilter, filters, intelligence, runLayer2Assistant, knimeData, knimeReport } = useBiData();
+  const {
+    setFilter,
+    filters,
+    intelligence,
+    runLayer2Assistant,
+    knimeData,
+    knimeReport,
+    runId,
+    setRunId,
+    availableRuns,
+    runsLoading,
+    runsError,
+    refreshRuns,
+  } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
-  const activeRun = correlations.run ?? 'run-latest';
-  const datasetExportConfig = useMemo(() => {
-    if (!dataset.length) {
-      return null;
-    }
-    const keys = Array.from(new Set(dataset.flatMap((row) => Object.keys(row))));
-    if (!keys.length) {
-      return null;
-    }
-    const columns = keys.map((key) => {
-      const { en, ar } = resolveFieldLabel(key);
-      return { key, label: en, labelAr: ar };
-    });
-    return {
-      fileName: `layer1-dataset-${activeRun}`,
-      columns,
-      rows: dataset,
-    };
-  }, [dataset, activeRun]);
+  const locale = language === 'ar' ? 'ar-SA' : 'en-US';
+  const dateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+    [locale],
+  );
+  const formatRunTimestamp = useCallback(
+    (value?: string | null) => {
+      if (!value) {
+        return translate('??????? ????????');
+      }
+      try {
+        return dateFormatter.format(new Date(value));
+      } catch (error) {
+        console.warn('[story-bi] failed to format run timestamp', error);
+        return translate('??????? ????????');
+      }
+    },
+    [dateFormatter, translate],
+  );
+  const selectedRun = useMemo(
+    () => availableRuns.find((run) => run.run_id === runId) ?? null,
+    [availableRuns, runId],
+  );
+  const formattedUpdatedAt = formatRunTimestamp(selectedRun?.updated_at);
+  const runPath = selectedRun?.path ?? null;
+  const noRunsAvailable = availableRuns.length === 0;
   const activeFilters = useMemo(
     () => Object.entries(filters).filter(([, values]) => values.length > 0),
     [filters],
@@ -806,6 +827,31 @@ const StoryBIContent: React.FC = () => {
   // Chart explanation state
   const [chartExplanations, setChartExplanations] = useState<Record<string, string>>({});
   const [chartExplainingKey, setChartExplainingKey] = useState<string | null>(null);
+
+  const dataRun = useMemo(
+    () => correlations.run ?? rawMetrics?.run ?? runId,
+    [correlations.run, rawMetrics?.run, runId],
+  );
+  const datasetExportConfig = useMemo(() => {
+    if (!dataset.length) {
+      return null;
+    }
+    const keys = Array.from(new Set(dataset.flatMap((row) => Object.keys(row))));
+    if (!keys.length) {
+      return null;
+    }
+    const columns = keys.map((key) => {
+      const { en, ar } = resolveFieldLabel(key);
+      return { key, label: en, labelAr: ar };
+    });
+    return {
+      fileName: `layer1-dataset-${dataRun}`,
+      columns,
+      rows: dataset,
+    };
+  }, [dataset, dataRun]);
+  const runMismatch = Boolean(dataRun && dataRun !== runId);
+  const approximateRows = rawMetrics?.totals?.orders ?? dimensions.row_count ?? dataset.length;
 
   const trends = rawMetrics?.trends;
   const breakdowns = rawMetrics?.breakdowns ?? [];
@@ -1531,53 +1577,131 @@ const StoryBIContent: React.FC = () => {
                 )}
               </p>
             </div>
-            <HelpTrigger
-              topicId="bi.overview"
-              aria-label={translate("شرح مساحة العمل للذكاء البياني")}
-              variant="link"
-              buildTopic={() => {
-                const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("بانتظار البيانات");
-                const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("بانتظار البيانات");
-                const coverage = rawMetrics?.order_date_range
-                  ? `${rawMetrics.order_date_range.min ?? translate("بانتظار البيانات")} → ${rawMetrics.order_date_range.max ?? translate("بانتظار البيانات")}`
-                  : translate("بانتظار البيانات");
-                return {
-                  title: translate("مساحة العمل السردية"),
-                  summary: translate(
-                    "تجمع هذه الصفحة مؤشرات الأداء، والرؤى، والارتباطات الناتجة عن المراحل 08 إلى 10 في قصة تشغيلية واحدة.",
-                  ),
-                  detailItems: [
-                    translate("الطلبات المعالجة: {value}", { value: orders }),
-                    translate("حصة الدفع عند الاستلام: {value}", { value: codShare }),
-                    translate("نطاق البيانات الزمنية: {range}", { range: coverage }),
-                  ],
-                  sources: [
-                    {
-                      label: translate("مخرجات المرحلة 08"),
-                      description: translate("تحليل البيانات الاستكشافي الذي يكشف عن المحركات والشذوذ."),
+            <div className="flex w-full flex-col items-end gap-3 sm:w-auto">
+              <div className="w-full max-w-sm rounded-2xl border border-border/50 bg-background/60 p-4 shadow-inner backdrop-blur">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {translate("?????? ???????")}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      void refreshRuns();
+                    }}
+                    disabled={runsLoading}
+                    aria-label={translate("????? ??? ???????")}
+                  >
+                    {runsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <Select value={runId} onValueChange={setRunId} disabled={runsLoading || noRunsAvailable}>
+                    <SelectTrigger className="flex-1 justify-between text-start">
+                      <SelectValue placeholder={translate("??? ????? ?????")} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64" dir="rtl">
+                      {availableRuns.length === 0 ? (
+                        <SelectItem value="__no-runs" disabled>
+                          {translate("?? ?????? ?????? ???????")}
+                        </SelectItem>
+                      ) : (
+                        availableRuns.map((run) => (
+                          <SelectItem key={run.run_id} value={run.run_id} className="text-start">
+                            {`${run.run_id} — ${formatRunTimestamp(run.updated_at)}`}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted/40 px-2 py-1">
+                    {translate("?????")}: <span className="font-mono text-foreground">{runId}</span>
+                  </span>
+                  {formattedUpdatedAt ? (
+                    <span className="rounded-full bg-muted/40 px-2 py-1">
+                      {translate("???? ?????")}: {formattedUpdatedAt}
+                    </span>
+                  ) : null}
+                  {typeof approximateRows === "number" && approximateRows > 0 ? (
+                    <span className="rounded-full bg-muted/40 px-2 py-1">
+                      {translate("??? ?????")}: {formatInteger(approximateRows)}
+                    </span>
+                  ) : null}
+                </div>
+                {runPath ? (
+                  <p className="mt-2 truncate text-[11px] text-muted-foreground">
+                    {translate("??????")}: <span className="font-mono text-foreground">{runPath}</span>
+                  </p>
+                ) : null}
+                {runsError ? (
+                  <p className="mt-2 text-xs text-destructive">
+                    {translate("????? ????? ???????: {message}", { message: runsError })}
+                  </p>
+                ) : null}
+                {runMismatch ? (
+                  <p className="mt-2 text-xs text-amber-600 dark:text-amber-300">
+                    {translate("??????? ???????? ??? ????? {value}", { value: dataRun })}
+                  </p>
+                ) : null}
+                {noRunsAvailable ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{translate("?? ?????? ?????? ???????.")}</p>
+                ) : null}
+                {datasetExportConfig ? (
+                  <div className="mt-3 flex justify-end">
+                    <ChartExport {...datasetExportConfig} label={translate("تصدير CSV")} />
+                  </div>
+                ) : null}
+              </div>
+              <HelpTrigger
+                topicId="bi.overview"
+                aria-label={translate("??? ????? ????? ?????? ???????")}
+                variant="link"
+                buildTopic={() => {
+                  const orders = rawMetrics?.totals?.orders != null ? formatInteger(rawMetrics.totals.orders) : translate("??????? ????????");
+                  const codShare = rawMetrics?.totals?.orders_cod_share_pct != null ? formatPercent(rawMetrics.totals.orders_cod_share_pct) : translate("??????? ????????");
+                  const coverage = rawMetrics?.order_date_range
+                    ? `${rawMetrics.order_date_range.min ?? translate("??????? ????????")} → ${rawMetrics.order_date_range.max ?? translate("??????? ????????")}`
+                    : translate("??????? ????????");
+                  return {
+                    title: translate("????? ????? ???????"),
+                    summary: translate("???? ??? ?????? ?????? ??????? ??????? ??????????? ??????? ?? ??????? 08 ??? 10 ?? ??? ??????? ?????."),
+                    detailItems: [
+                      translate("??????? ????????: {value}", { value: orders }),
+                      translate("??? ????? ??? ????????: {value}", { value: codShare }),
+                      translate("???? ???????? ???????: {range}", { range: coverage }),
+                    ],
+                    sources: [
+                      {
+                        label: translate("?????? ??????? 08"),
+                        description: translate("????? ???????? ?????????? ???? ???? ?? ???????? ???????."),
+                      },
+                      {
+                        label: translate("????? ??????? 09"),
+                        description: translate("????? ?????? ???????? ????? ???????? ??????? SLA."),
+                      },
+                      {
+                        label: translate("????? ??????? 10"),
+                        description: translate("???????? ???????? ???? ???? ??????? ??????? ????????."),
+                      },
+                    ],
+                    suggestedQuestions: [
+                      translate("?? ?? ?????? ???? ???? ???? ?????? ???????"),
+                      translate("?? ???????? ??? ???????? ?? ???? ?????????"),
+                    ],
+                    onAsk: () => {
+                      setActiveTab("narrative");
+                      setSidePanelOpen(true);
                     },
-                    {
-                      label: translate("بوابة المرحلة 09"),
-                      description: translate("نتائج التحقق التشغيلي وقياس الالتزام بمؤشرات SLA."),
-                    },
-                    {
-                      label: translate("مخازن المرحلة 10"),
-                      description: translate("المقاييس المعتمدة التي تغذي اللوحات والرسوم البيانية."),
-                    },
-                  ],
-                  suggestedQuestions: [
-                    translate("ما هو البُعد الذي يفسر تغير المؤشر الأخير؟"),
-                    translate("أي الشذوذات يجب مناقشتها مع فريق العمليات؟"),
-                  ],
-                  onAsk: () => {
-                    setActiveTab("narrative");
-                    setSidePanelOpen(true);
-                  },
-                };
-              }}
-            >
-              {translate("مركز المساعدة")}
-            </HelpTrigger>
+                  };
+                }}
+              >
+                {translate("???? ????????")}
+              </HelpTrigger>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
             {translate(

@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 
+import { api, type PipelineRunInfo } from "@/lib/api";
+
 import {
   fallbackCorrelations,
   fallbackDataset,
@@ -56,6 +58,7 @@ type BiDataProviderProps = {
 const MAX_ROWS = 25_000;
 const DEFAULT_BASE = process.env.NEXT_PUBLIC_BI_BASE ?? "/api/bi";
 const DEFAULT_RUN = process.env.NEXT_PUBLIC_BI_RUN ?? "run-latest";
+const RUN_STORAGE_KEY = "story-bi/run-id";
 
 const BiDataContext = createContext<BiDataContextValue | undefined>(undefined);
 
@@ -175,16 +178,16 @@ const normaliseAgentFilters = (filters: Record<string, unknown> | undefined): Re
   return normalised;
 };
 
-const buildDefaultEndpoints = (): Required<EndpointOverrides> => ({
-  metrics: `${DEFAULT_BASE}/metrics?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(DEFAULT_RUN)}&top=50`,
-  intelligence: `${DEFAULT_BASE}/intelligence?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  catalog: `${DEFAULT_BASE}/kpi-catalog?run=${encodeURIComponent(DEFAULT_RUN)}`,
-  knime: `${DEFAULT_BASE}/knime-data?run=${encodeURIComponent(DEFAULT_RUN)}&limit=250`,
-  knimeReport: `${DEFAULT_BASE}/knime-report?run=${encodeURIComponent(DEFAULT_RUN)}`,
+const buildDefaultEndpoints = (run: string): Required<EndpointOverrides> => ({
+  metrics: `${DEFAULT_BASE}/metrics?run=${encodeURIComponent(run)}`,
+  dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(run)}`,
+  insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(run)}`,
+  dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(run)}`,
+  correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(run)}&top=50`,
+  intelligence: `${DEFAULT_BASE}/intelligence?run=${encodeURIComponent(run)}`,
+  catalog: `${DEFAULT_BASE}/kpi-catalog?run=${encodeURIComponent(run)}`,
+  knime: `${DEFAULT_BASE}/knime-data?run=${encodeURIComponent(run)}&limit=250`,
+  knimeReport: `${DEFAULT_BASE}/knime-report?run=${encodeURIComponent(run)}`,
 });
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {
@@ -304,7 +307,23 @@ const normaliseInsightsPayload = (payload: unknown) => {
 };
 
 export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoints }) => {
-  const mergedEndpoints = { ...buildDefaultEndpoints(), ...endpoints };
+  const [currentRun, setCurrentRun] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(RUN_STORAGE_KEY);
+      if (stored && stored.trim()) {
+        return stored;
+      }
+    }
+    return DEFAULT_RUN;
+  });
+  const [availableRuns, setAvailableRuns] = useState<PipelineRunInfo[]>([]);
+  const [runsLoading, setRunsLoading] = useState<boolean>(false);
+  const [runsError, setRunsError] = useState<string | undefined>(undefined);
+
+  const mergedEndpoints = useMemo(() => {
+    const defaults = buildDefaultEndpoints(currentRun);
+    return { ...defaults, ...(endpoints ?? {}) };
+  }, [currentRun, endpoints]);
 
   const [metrics, setMetrics] = useState<MetricSpec[]>([]);
   const [dimensions, setDimensions] = useState<DimensionsCatalog>(EMPTY_DIMENSIONS);
@@ -320,11 +339,59 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const [catalogMeta, setCatalogMeta] = useState<CatalogMetadata>({});
   const [insightStats, setInsightStats] = useState<InsightStats | undefined>(undefined);
 
+  const refreshRuns = useCallback(async () => {
+    setRunsLoading(true);
+    try {
+      const response = await api.listRuns();
+      const sorted = (response?.runs ?? [])
+        .slice()
+        .sort((a, b) => {
+          const aTime = a?.updated_at ? new Date(a.updated_at).getTime() : 0;
+          const bTime = b?.updated_at ? new Date(b.updated_at).getTime() : 0;
+          return bTime - aTime;
+        });
+      setAvailableRuns(sorted);
+      setRunsError(undefined);
+      setCurrentRun((previous) => {
+        if (!sorted.length) {
+          return previous || DEFAULT_RUN;
+        }
+        if (sorted.some((run) => run.run_id === previous)) {
+          return previous;
+        }
+        return sorted[0].run_id;
+      });
+    } catch (err) {
+      setRunsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshRuns();
+  }, [refreshRuns]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(RUN_STORAGE_KEY, currentRun);
+    }
+  }, [currentRun]);
+
+  useEffect(() => {
+    setFilters({});
+  }, [currentRun]);
+
+  const handleRunChange = useCallback((runId: string) => {
+    setCurrentRun(runId && runId.trim() ? runId : DEFAULT_RUN);
+  }, []);
+
   useEffect(() => {
     let active = true;
 
     const load = async () => {
       setLoading(true);
+      setError(undefined);
       try {
         const [
           metricsRes,
@@ -409,7 +476,6 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         setCorrelations(resolvedCorrelations);
         const parsedIntelligence = layer3IntelligenceSchema.safeParse(intelligenceRes);
         setIntelligence(parsedIntelligence.success ? parsedIntelligence.data : fallbackIntelligence);
-        setError(undefined);
       } catch (err) {
         if (!active) return;
         const message = err instanceof Error ? err.message : "تعذر تحميل بيانات الـ BI";
@@ -436,22 +502,12 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     return () => {
       active = false;
     };
-  }, [
-    mergedEndpoints.metrics,
-    mergedEndpoints.dimensions,
-    mergedEndpoints.insights,
-    mergedEndpoints.dataset,
-    mergedEndpoints.correlations,
-    mergedEndpoints.intelligence,
-    mergedEndpoints.catalog,
-    mergedEndpoints.knime,
-    mergedEndpoints.knimeReport,
-  ]);
+  }, [mergedEndpoints]);
 
   const runLayer2Assistant = useCallback(
     async (request: Layer2AgentRequest): Promise<Layer2AgentResult> => {
       const payload = {
-        run: request.run ?? DEFAULT_RUN,
+        run: request.run ?? currentRun,
         question: request.question,
         filters: request.filters ?? filters,
         history: (request.history ?? []).map((message) => ({
@@ -504,11 +560,17 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
         context: data.context,
       };
     },
-    [filters],
+    [filters, currentRun],
   );
 
   const value = useMemo<BiDataContextValue>(
     () => ({
+      runId: currentRun,
+      setRunId: handleRunChange,
+      availableRuns,
+      runsLoading,
+      runsError,
+      refreshRuns,
       metrics,
       dimensions,
       insights,
@@ -539,6 +601,12 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       runLayer2Assistant,
     }),
     [
+      currentRun,
+      handleRunChange,
+      availableRuns,
+      runsLoading,
+      runsError,
+      refreshRuns,
       metrics,
       dimensions,
       insights,
