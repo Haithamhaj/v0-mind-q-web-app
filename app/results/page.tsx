@@ -207,6 +207,7 @@ function Label({ children, className, ...props }: React.ComponentPropsWithoutRef
 export default function ResultsPage() {
   const [runs, setRuns] = useState<PipelineRunInfo[]>([])
   const [selectedRun, setSelectedRun] = useState<string>("")
+  const [artifactsRoot, setArtifactsRoot] = useState<string>("")
   const [artifacts, setArtifacts] = useState<ArtifactPhaseInfo[]>([])
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [artifactPreview, setArtifactPreview] = useState<ArtifactContentResponse | null>(null)
@@ -235,6 +236,7 @@ export default function ResultsPage() {
       .then((response: RunListResponse) => {
         const orderedRuns = response.runs
         setRuns(orderedRuns)
+        setArtifactsRoot(String(response.artifacts_root || ""))
         if (orderedRuns.length === 0) {
           setSelectedRun("")
           return
@@ -271,7 +273,7 @@ export default function ResultsPage() {
     setArtifactsError(null)
     setArtifactPreview(null)
     setSelectedFilePath("")
-    Promise.all([api.listRunArtifacts(selectedRun), api.getBiMeta(selectedRun)])
+    Promise.all([api.listRunArtifacts(selectedRun, artifactsRoot), api.getBiMeta(selectedRun, artifactsRoot)])
       .then(([artifactResponse, metaResponse]: [RunArtifactsResponse, Record<string, unknown>]) => {
         if (!active) return
         setArtifacts(artifactResponse.phases || [])
@@ -314,7 +316,7 @@ export default function ResultsPage() {
     return () => {
       active = false
     }
-  }, [selectedRun, selectedMetricId])
+  }, [selectedRun, selectedMetricId, artifactsRoot])
 
   const filteredPhases = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -356,7 +358,7 @@ export default function ResultsPage() {
     setPreviewError(null)
     setSelectedFilePath(path)
     try {
-      const preview = await api.getArtifactContent(selectedRun, path)
+      const preview = await api.getArtifactContent(selectedRun, path, artifactsRoot)
       setArtifactPreview(preview)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load artifact"
@@ -371,7 +373,7 @@ export default function ResultsPage() {
     if (!selectedRun) return
     setPreviewError(null)
     try {
-      const preview = await api.getArtifactContent(selectedRun, path)
+      const preview = await api.getArtifactContent(selectedRun, path, artifactsRoot)
       const contentText =
         typeof preview.content === "string"
           ? preview.content
@@ -446,7 +448,7 @@ export default function ResultsPage() {
     const featureReportPath = byName("feature_report.json")
     if (summaryPath) {
       api
-        .getArtifactContent(selectedRun, summaryPath)
+        .getArtifactContent(selectedRun, summaryPath, artifactsRoot)
         .then((res) => setKnimeSummary((res.content as Record<string, unknown>) ?? null))
         .catch(() => setKnimeSummary(null))
     } else {
@@ -454,13 +456,13 @@ export default function ResultsPage() {
     }
     if (featureReportPath) {
       api
-        .getArtifactContent(selectedRun, featureReportPath)
+        .getArtifactContent(selectedRun, featureReportPath, artifactsRoot)
         .then((res) => setKnimeFeatureReport((res.content as Record<string, unknown>) ?? null))
         .catch(() => setKnimeFeatureReport(null))
     } else {
       setKnimeFeatureReport(null)
     }
-  }, [selectedRun, artifacts])
+  }, [selectedRun, artifacts, artifactsRoot])
 
   return (
     <div className="flex h-screen">

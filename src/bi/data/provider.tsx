@@ -57,7 +57,8 @@ type BiDataProviderProps = {
 
 const MAX_ROWS = 25_000;
 const DEFAULT_BASE = process.env.NEXT_PUBLIC_BI_BASE ?? "/api/bi";
-const DEFAULT_RUN = process.env.NEXT_PUBLIC_BI_RUN ?? "run-latest";
+// During testing, avoid hardcoded runs; prefer URL ?run=… or latest
+const DEFAULT_RUN = "";
 const RUN_STORAGE_KEY = "story-bi/run-id";
 
 const BiDataContext = createContext<BiDataContextValue | undefined>(undefined);
@@ -309,6 +310,11 @@ const normaliseInsightsPayload = (payload: unknown) => {
 export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoints }) => {
   const [currentRun, setCurrentRun] = useState<string>(() => {
     if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const fromQuery = params.get("run");
+      if (fromQuery && fromQuery.trim()) {
+        return fromQuery.trim();
+      }
       const stored = window.localStorage.getItem(RUN_STORAGE_KEY);
       if (stored && stored.trim()) {
         return stored;
@@ -353,8 +359,11 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       setAvailableRuns(sorted);
       setRunsError(undefined);
       setCurrentRun((previous) => {
-        if (!sorted.length) {
-          return previous || DEFAULT_RUN;
+        if (!sorted.length) return previous || DEFAULT_RUN;
+        // honour run from URL query if present
+        if (typeof window !== "undefined") {
+          const q = new URLSearchParams(window.location.search).get("run");
+          if (q && sorted.some((r) => r.run_id === q)) return q;
         }
         if (sorted.some((run) => run.run_id === previous)) {
           return previous;

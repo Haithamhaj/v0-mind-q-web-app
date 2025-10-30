@@ -1185,7 +1185,7 @@ const StoryBIContent: React.FC = () => {
       try {
         setRawMetricsLoading(true);
         setRawMetricsError(null);
-        const response = await fetch(`/api/bi/metrics/raw?run=run-latest&top=6`, { signal: controller.signal });
+        const response = await fetch(`/api/bi/metrics/raw?run=${encodeURIComponent(runId)}&top=6`, { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`Failed to load raw metrics: ${response.status}`);
         }
