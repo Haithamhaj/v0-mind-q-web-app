@@ -58,6 +58,7 @@ export default function PhasesPage(): React.JSX.Element {
     | null
   >(null)
   const [isRunningBiPlan, setIsRunningBiPlan] = useState(false)
+  const [isExplainingChart, setIsExplainingChart] = useState(false)
   const [biResult, setBiResult] = useState<BiPhaseResponse | null>(null)
   const { toast } = useToast()
 
@@ -312,6 +313,64 @@ export default function PhasesPage(): React.JSX.Element {
       })
     } finally {
       setIsRunningBiPlan(false)
+    }
+  }
+
+  const handleExplainChart = async () => {
+    if (!biResult) {
+      toast({
+        title: "Run Phase 10 first",
+        description: "Generate Stage 10 artifacts before using the assistant.",
+        variant: "destructive",
+      })
+      return
+    }
+    // Compose a concise Arabic question with chart context
+    const title = biChartMeta?.title ?? "رسم بياني"
+    const chartType = biChartMeta?.chartType ?? "bar"
+    const xKey = biChartMeta?.xKey ?? "dt"
+    const valueKey = biChartMeta?.valueKey ?? "val"
+    const metricId = biChartMeta?.metricId ?? ""
+    const sampleRows = (biChartData ?? []).slice(0, 20)
+
+    const question = [
+      `اشرح الرسم التالي بشكل موجز وواضح للمستخدم غير التقني:`,
+      `العنوان: ${title}`,
+      `النوع: ${chartType}`,
+      `المحور الأفقي (${xKey}) والمحور العمودي (${valueKey})`,
+      metricId ? `المتريك: ${metricId}` : "",
+      `قدّم تلخيصاً لأبرز الأنماط، القيم الشاذة، الاتجاهات، وأي نقاط يجب الانتباه لها.`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+
+    setIsExplainingChart(true)
+    try {
+      const response = await api.biPlan(runId, question, {
+        artifacts_root: biResult.artifacts_root,
+        timezone: biResult.semantic?.timezone as string | undefined,
+        currency: biResult.semantic?.currency as string | undefined,
+      })
+      // Prefer plan.explain_ar if present; otherwise keep full plan
+      setBiLlmResult({ plan: response.plan, data: response.data })
+      setBiChartData(sampleRows.length > 0 ? sampleRows : response.data)
+      setBiChartMeta((prev) => ({
+        title: prev?.title ?? title,
+        chartType: prev?.chartType ?? chartType,
+        xKey: prev?.xKey ?? xKey,
+        valueKey: prev?.valueKey ?? valueKey,
+        description: typeof response.plan?.explain_ar === "string" ? (response.plan.explain_ar as string) : prev?.description,
+        metricId: prev?.metricId ?? metricId,
+      }))
+    } catch (error) {
+      console.error("[phases] BI explanation failed:", error)
+      toast({
+        title: "Assistant failed",
+        description: error instanceof Error ? error.message : "Unable to generate an explanation.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExplainingChart(false)
     }
   }
 
@@ -640,9 +699,15 @@ export default function PhasesPage(): React.JSX.Element {
                                 <p className="text-xs text-muted-foreground">{biChartMeta.description}</p>
                               ) : null}
                             </div>
-                            {(isRunningBiQuery || isRunningBiPlan) && (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            )}
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" variant="outline" onClick={handleExplainChart} disabled={isExplainingChart}>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                {isExplainingChart ? "Explaining..." : "Explain with AI"}
+                              </Button>
+                              {(isRunningBiQuery || isRunningBiPlan) && (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              )}
+                            </div>
                           </div>
                           <VisualizationAdapter
                             data={biChartData ?? []}

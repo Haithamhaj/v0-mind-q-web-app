@@ -202,9 +202,11 @@ export interface BiCorrelationExplainResponse {
 
 class MindQAPI {
   private baseURL: string
+  private biQueryCache: Map<string, { rows: Array<Record<string, unknown>>; n: number; ts: number }>
 
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL || CLIENT_DEFAULT_API_BASE_URL
+    this.biQueryCache = new Map()
   }
 
   private buildURL(path: string) {
@@ -348,7 +350,19 @@ class MindQAPI {
     options?: { artifacts_root?: string; timezone?: string; currency?: string; llm_enabled?: boolean },
   ): Promise<{ rows: Array<Record<string, unknown>>; n: number }> {
     const payload = { sql, ...(options ?? {}) }
-    return this.post(`/v1/bi/${runId}/query`, payload)
+    const key = JSON.stringify({ runId, sql, options })
+    const now = Date.now()
+    const ttlMs = 60_000
+    const cached = this.biQueryCache.get(key)
+    if (cached && now - cached.ts < ttlMs) {
+      return { rows: cached.rows, n: cached.n }
+    }
+    const result = await this.post<{ rows: Array<Record<string, unknown>>; n: number }>(
+      `/v1/bi/${runId}/query`,
+      payload,
+    )
+    this.biQueryCache.set(key, { ...result, ts: now })
+    return result
   }
 
   async biPlan(

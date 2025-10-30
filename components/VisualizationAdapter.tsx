@@ -1,12 +1,14 @@
 "use client"
 
 import type { FC } from "react"
+import dynamic from "next/dynamic"
 import { BiChart } from "@/components/bi-chart"
-import { HeatmapChart } from "@/src/bi/components/layer2/HeatmapChart"
-import { BoxPlotChart } from "@/src/bi/components/layer2/BoxPlotChart"
-import { WaterfallChart } from "@/src/bi/components/layer2/WaterfallChart"
-import { ScatterChart } from "@/src/bi/components/layer2/ScatterChart"
-import { MultiAxisLineChart } from "@/src/bi/components/layer2/MultiAxisLineChart"
+
+const HeatmapChart = dynamic(() => import("@/src/bi/components/layer2/HeatmapChart").then(m => m.HeatmapChart), { ssr: false })
+const BoxPlotChart = dynamic(() => import("@/src/bi/components/layer2/BoxPlotChart").then(m => m.BoxPlotChart), { ssr: false })
+const WaterfallChart = dynamic(() => import("@/src/bi/components/layer2/WaterfallChart").then(m => m.WaterfallChart), { ssr: false })
+const ScatterChart = dynamic(() => import("@/src/bi/components/layer2/ScatterChart").then(m => m.ScatterChart), { ssr: false })
+const MultiAxisLineChart = dynamic(() => import("@/src/bi/components/layer2/MultiAxisLineChart").then(m => m.MultiAxisLineChart), { ssr: false })
 
 export type VizSpec = {
   engine?: "echarts"

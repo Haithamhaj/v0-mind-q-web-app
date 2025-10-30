@@ -29,6 +29,8 @@ export const BiChart: FC<BiChartProps> = ({ data, chartType, xKey, valueKey = "v
       valueKey in first
         ? valueKey
         : (Object.keys(first).find((k) => typeof (first as any)[k] === "number") ?? valueKey)
+    const locale = typeof document !== "undefined" ? document.documentElement.lang || "ar" : "ar"
+    const nf = typeof Intl !== "undefined" ? new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }) : { format: (n: number) => String(n) }
 
     const base: EChartsCoreOption = {
       color: DEFAULT_COLORS,
@@ -39,6 +41,32 @@ export const BiChart: FC<BiChartProps> = ({ data, chartType, xKey, valueKey = "v
         trigger: chartType === "pie" ? "item" : "axis",
         confine: true,
         axisPointer: chartType === "pie" ? undefined : { type: "cross" },
+        formatter: (params: any) => {
+          try {
+            if (Array.isArray(params)) {
+              const x = params[0]?.axisValueLabel ?? params[0]?.name ?? ""
+              const lines = params.map((p) => {
+                const seriesName = p.seriesName || valueKey
+                let val = p.value
+                if (p.encode && p.encode.y && Array.isArray(p.encode.y) && p.encode.y.length > 0) {
+                  val = p.value?.[p.encode.y[0]]
+                }
+                const num = Number(val ?? 0)
+                return `${p.marker || ""}${seriesName}: ${nf.format(num)}`
+              })
+              return `<div style="text-align:right">${x}<br/>${lines.join("<br/>")}</div>`
+            }
+            const name = params.name ?? ""
+            let val = params.value
+            if (params.encode && params.encode.value && Array.isArray(params.encode.value) && params.encode.value.length > 0) {
+              val = params.value?.[params.encode.value[0]]
+            }
+            const num = Number(val ?? 0)
+            return `<div style=\"text-align:right\">${name}<br/>${nf.format(num)}</div>`
+          } catch {
+            return undefined as any
+          }
+        },
       },
       toolbox: { feature: { saveAsImage: {}, dataZoom: {}, restore: {} } },
       dataZoom: chartType === "pie" ? undefined : [{ type: "inside" }, { type: "slider" }],
