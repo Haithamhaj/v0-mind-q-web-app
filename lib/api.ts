@@ -200,6 +200,123 @@ export interface BiCorrelationExplainResponse {
   explanation: BiCorrelationExplanation
 }
 
+export type BusinessLayer = "operational" | "commercial" | "financial" | "general"
+
+export interface ChartExplainRequest {
+  chart_title: string
+  chart_type?: string
+  data_summary?: string | null
+  business_layer?: BusinessLayer | null
+  language?: "ar" | "en"
+  use_llm?: boolean
+  provider?: string | null
+  model?: string | null
+  temperature?: number | null
+  max_tokens?: number | null
+}
+
+export interface ChartExplainResponse {
+  explanation: string
+  mode: "llm" | "fallback" | "fallback_after_error"
+  chart_title?: string
+  chart_type?: string
+  business_layer?: BusinessLayer
+  provider?: string
+  model?: string
+  tokens_in?: number
+  tokens_out?: number
+  cost_estimate?: number
+  duration_s?: number
+  error?: string
+  [key: string]: unknown
+}
+
+export interface SlaAssistantMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+export interface SlaAssistantRequest {
+  run?: string
+  question: string
+  history?: SlaAssistantMessage[]
+  provider?: string | null
+  model?: string | null
+  temperature?: number
+  max_tokens?: number
+}
+
+export interface SlaAssistantResponse {
+  reply: Record<string, unknown>
+  provider: string
+  model: string
+  tokens_in: number
+  tokens_out: number
+  cost_estimate: number
+  duration_s: number
+  context?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export interface RawMetricsMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+export interface RawMetricsLLMRequest {
+  run?: string
+  top?: number
+  question: string
+  history?: RawMetricsMessage[]
+  provider?: string | null
+  model?: string | null
+  temperature?: number
+  max_tokens?: number
+}
+
+export interface RawMetricsLLMResponse {
+  reply: Record<string, unknown>
+  provider: string
+  model: string
+  tokens_in: number
+  tokens_out: number
+  cost_estimate: number
+  duration_s: number
+  metrics: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export interface Layer2AssistantMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+export interface Layer2AssistantRequest {
+  run?: string
+  question: string
+  filters?: Record<string, string[]>
+  history?: Layer2AssistantMessage[]
+  provider?: string | null
+  model?: string | null
+  temperature?: number
+  max_tokens?: number
+  top_p?: number
+}
+
+export interface Layer2AssistantResponse {
+  reply: string
+  recommendation?: Record<string, unknown>
+  provider: string
+  model: string
+  tokens_in: number
+  tokens_out: number
+  cost_estimate: number
+  duration_s: number
+  context?: Record<string, unknown>
+  used_fallback: boolean
+  [key: string]: unknown
+}
+
 class MindQAPI {
   private baseURL: string
   private biQueryCache: Map<string, { rows: Array<Record<string, unknown>>; n: number; ts: number }>
@@ -215,6 +332,18 @@ class MindQAPI {
       return `${normalizedBase}${path}`
     }
     return `${normalizedBase}/${path}`
+  }
+
+  private buildQueryString(params: Record<string, string | number | boolean | null | undefined>) {
+    const search = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null || value === "") {
+        continue
+      }
+      search.append(key, String(value))
+    }
+    const query = search.toString()
+    return query ? `?${query}` : ""
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -281,14 +410,19 @@ class MindQAPI {
     return this.handleResponse<T>(response)
   }
 
-  private async post<T>(path: string, payload: unknown): Promise<T> {
+  private async post<T>(path: string, payload?: unknown): Promise<T> {
+    const headers: HeadersInit = {
+      Accept: "application/json",
+    }
+    let body: string | undefined
+    if (payload !== undefined) {
+      headers["Content-Type"] = "application/json"
+      body = JSON.stringify(payload)
+    }
     const response = await fetch(this.buildURL(path), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
+      headers,
+      body,
     })
 
     return this.handleResponse<T>(response)
@@ -308,6 +442,95 @@ class MindQAPI {
     })
 
     return this.handleResponse<UploadResponse>(response)
+  }
+
+  async getBiMetrics(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/metrics${query}`)
+  }
+
+  async getBiKpiCatalog(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/kpi-catalog${query}`)
+  }
+
+  async getBiDimensions(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/dimensions${query}`)
+  }
+
+  async getBiInsights(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/insights${query}`)
+  }
+
+  async getBiCorrelations(run?: string, top?: number): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run, top })
+    return this.get(`/api/bi/correlations${query}`)
+  }
+
+  async explainBiChart(request: ChartExplainRequest): Promise<ChartExplainResponse> {
+    return this.post(`/api/bi/charts/explain`, request)
+  }
+
+  async getSlaSummary(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/sla${query}`)
+  }
+
+  async getSlaSop(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/sla/sop${query}`)
+  }
+
+  async getSlaGapAnalysis(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/sla/gap-analysis${query}`)
+  }
+
+  async getBiData(run?: string, limit?: number): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run, limit })
+    return this.get(`/api/bi/data${query}`)
+  }
+
+  async converseSlaAssistant(request: SlaAssistantRequest): Promise<SlaAssistantResponse> {
+    return this.post(`/api/bi/sla/assistant`, request)
+  }
+
+  async getRawMetrics(run?: string, top?: number): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run, top })
+    return this.get(`/api/bi/metrics/raw${query}`)
+  }
+
+  async converseRawMetrics(request: RawMetricsLLMRequest): Promise<RawMetricsLLMResponse> {
+    return this.post(`/api/bi/metrics/raw/llm`, request)
+  }
+
+  async getKnimeData(
+    run?: string,
+    options: { limit?: number; offset?: number } = {},
+  ): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run, limit: options.limit, offset: options.offset })
+    return this.get(`/api/bi/knime-data${query}`)
+  }
+
+  async getKnimeReport(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/knime-report${query}`)
+  }
+
+  async getIntelligence(run?: string): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run })
+    return this.get(`/api/bi/intelligence${query}`)
+  }
+
+  async getOrders(run?: string, limit?: number): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ run, limit })
+    return this.get(`/api/bi/orders${query}`)
+  }
+
+  async converseLayer2Assistant(request: Layer2AssistantRequest): Promise<Layer2AssistantResponse> {
+    return this.post(`/api/bi/layer2/assistant`, request)
   }
 
   async runPhase01(runId: string, request: IngestionRequest): Promise<Record<string, unknown>> {
@@ -382,6 +605,10 @@ class MindQAPI {
     return this.post(`/v1/runs/${runId}/phases/07/llm-summary`, request)
   }
 
+  async runBusinessCorrelations(runId: string, request: PhaseRequest): Promise<Record<string, unknown>> {
+    return this.post(`/v1/runs/${runId}/phases/07/business-correlations`, request)
+  }
+
   async runKnimeBridge(runId: string, request: PhaseRequest = { use_defaults: true }): Promise<Record<string, unknown>> {
     return this.post(`/v1/runs/${runId}/phases/07/knime-bridge`, request)
   }
@@ -407,6 +634,14 @@ class MindQAPI {
     }
 
     return this.handleResponse<PipelineResponse>(response)
+  }
+
+  async runCausalPhase(
+    runId: string,
+    options: { problem_name?: string } = {},
+  ): Promise<Record<string, unknown>> {
+    const query = this.buildQueryString({ problem_name: options.problem_name })
+    return this.post(`/v1/runs/${runId}/phases/09_5_causal${query}`)
   }
 
   async listRuns(artifactsRoot?: string): Promise<RunListResponse> {
