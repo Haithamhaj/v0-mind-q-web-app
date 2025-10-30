@@ -179,17 +179,22 @@ const normaliseAgentFilters = (filters: Record<string, unknown> | undefined): Re
   return normalised;
 };
 
-const buildDefaultEndpoints = (run: string): Required<EndpointOverrides> => ({
-  metrics: `${DEFAULT_BASE}/metrics?run=${encodeURIComponent(run)}`,
-  dimensions: `${DEFAULT_BASE}/dimensions?run=${encodeURIComponent(run)}`,
-  insights: `${DEFAULT_BASE}/insights?run=${encodeURIComponent(run)}`,
-  dataset: `${DEFAULT_BASE}/orders?run=${encodeURIComponent(run)}`,
-  correlations: `${DEFAULT_BASE}/correlations?run=${encodeURIComponent(run)}&top=50`,
-  intelligence: `${DEFAULT_BASE}/intelligence?run=${encodeURIComponent(run)}`,
-  catalog: `${DEFAULT_BASE}/kpi-catalog?run=${encodeURIComponent(run)}`,
-  knime: `${DEFAULT_BASE}/knime-data?run=${encodeURIComponent(run)}&limit=250`,
-  knimeReport: `${DEFAULT_BASE}/knime-report?run=${encodeURIComponent(run)}`,
-});
+const buildDefaultEndpoints = (run: string, artifactsRoot?: string): Required<EndpointOverrides> => {
+  const ar = artifactsRoot && artifactsRoot.trim() ? `&artifacts_root=${encodeURIComponent(artifactsRoot)}` : "";
+  const runParam = run && run.trim() ? `run=${encodeURIComponent(run)}` : "";
+  const qp = (base: string) => `${base}${runParam ? `?${runParam}${ar}` : ar ? `?${ar.slice(1)}` : ""}`;
+  return {
+    metrics: qp(`${DEFAULT_BASE}/metrics`),
+    dimensions: qp(`${DEFAULT_BASE}/dimensions`),
+    insights: qp(`${DEFAULT_BASE}/insights`),
+    dataset: qp(`${DEFAULT_BASE}/orders`),
+    correlations: qp(`${DEFAULT_BASE}/correlations`) + (qp(`${DEFAULT_BASE}/correlations`).includes("?") ? "&" : "?") + "top=50",
+    intelligence: qp(`${DEFAULT_BASE}/intelligence`),
+    catalog: qp(`${DEFAULT_BASE}/kpi-catalog`),
+    knime: qp(`${DEFAULT_BASE}/knime-data`) + (qp(`${DEFAULT_BASE}/knime-data`).includes("?") ? "&" : "?") + "limit=250",
+    knimeReport: qp(`${DEFAULT_BASE}/knime-report`),
+  };
+};
 
 const fetchJson = async <T,>(url: string | undefined, fallback: T): Promise<T> => {
   if (!url) {
@@ -326,10 +331,12 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const [runsLoading, setRunsLoading] = useState<boolean>(false);
   const [runsError, setRunsError] = useState<string | undefined>(undefined);
 
+  const [serverArtifactsRoot, setServerArtifactsRoot] = useState<string | undefined>(undefined);
+
   const mergedEndpoints = useMemo(() => {
-    const defaults = buildDefaultEndpoints(currentRun);
+    const defaults = buildDefaultEndpoints(currentRun, serverArtifactsRoot);
     return { ...defaults, ...(endpoints ?? {}) };
-  }, [currentRun, endpoints]);
+  }, [currentRun, serverArtifactsRoot, endpoints]);
 
   const [metrics, setMetrics] = useState<MetricSpec[]>([]);
   const [dimensions, setDimensions] = useState<DimensionsCatalog>(EMPTY_DIMENSIONS);
@@ -349,6 +356,7 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     setRunsLoading(true);
     try {
       const response = await api.listRuns();
+      setServerArtifactsRoot(typeof response?.artifacts_root === "string" ? response.artifacts_root : undefined);
       const sorted = (response?.runs ?? [])
         .slice()
         .sort((a, b) => {
