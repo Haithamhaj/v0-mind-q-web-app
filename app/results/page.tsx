@@ -214,6 +214,9 @@ export default function ResultsPage() {
   const [metrics, setMetrics] = useState<Array<Record<string, unknown>>>([])
   const [selectedMetricId, setSelectedMetricId] = useState<string>("")
   const [metricResponse, setMetricResponse] = useState<BiMetricResponse | null>(null)
+  // KNIME quick summary
+  const [knimeSummary, setKnimeSummary] = useState<Record<string, unknown> | null>(null)
+  const [knimeFeatureReport, setKnimeFeatureReport] = useState<Record<string, unknown> | null>(null)
 
   const [isLoadingRuns, setIsLoadingRuns] = useState<boolean>(true)
   const [runsError, setRunsError] = useState<string | null>(null)
@@ -428,6 +431,36 @@ export default function ResultsPage() {
       active = false
     }
   }, [selectedRun, selectedMetricId])
+
+  // Auto-load KNIME key files if present
+  useEffect(() => {
+    if (!selectedRun || artifacts.length === 0) {
+      setKnimeSummary(null)
+      setKnimeFeatureReport(null)
+      return
+    }
+    const allFiles = artifacts.flatMap((p) => p.files || [])
+    const profileFiles = allFiles.filter((f) => f.path.toLowerCase().includes("phase_07_knime/profile/"))
+    const byName = (name: string) => profileFiles.find((f) => f.name === name)?.path
+    const summaryPath = byName("bridge_summary.json")
+    const featureReportPath = byName("feature_report.json")
+    if (summaryPath) {
+      api
+        .getArtifactContent(selectedRun, summaryPath)
+        .then((res) => setKnimeSummary((res.content as Record<string, unknown>) ?? null))
+        .catch(() => setKnimeSummary(null))
+    } else {
+      setKnimeSummary(null)
+    }
+    if (featureReportPath) {
+      api
+        .getArtifactContent(selectedRun, featureReportPath)
+        .then((res) => setKnimeFeatureReport((res.content as Record<string, unknown>) ?? null))
+        .catch(() => setKnimeFeatureReport(null))
+    } else {
+      setKnimeFeatureReport(null)
+    }
+  }, [selectedRun, artifacts])
 
   return (
     <div className="flex h-screen">
@@ -658,6 +691,35 @@ export default function ResultsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {knimeSummary ? (
+                      <div className="rounded-md border border-border/60 bg-muted/10 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">Exit: {String((knimeSummary as any)?.batch?.exit_code ?? "N/A")}</Badge>
+                          {Boolean((knimeSummary as any)?.batch?.duration_s) && (
+                            <Badge variant="secondary">{String((knimeSummary as any)?.batch?.duration_s)}s</Badge>
+                          )}
+                          <Badge variant="outline">Mode: {String((knimeSummary as any)?.mode ?? "-")}</Badge>
+                        </div>
+                        {Boolean((knimeSummary as any)?.batch?.stdout_path) && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Log: {(knimeSummary as any)?.batch?.stdout_path}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed border-border/60 p-3 text-xs text-muted-foreground">
+                        bridge_summary.json not found yet.
+                      </div>
+                    )}
+
+                    {knimeFeatureReport ? (
+                      <div className="rounded-md border border-border/60 bg-muted/10 p-3">
+                        <div className="mb-1 text-sm font-medium text-foreground">Feature Report (excerpt)</div>
+                        <pre className="max-h-48 overflow-auto text-xs text-muted-foreground">
+                          {JSON.stringify(knimeFeatureReport, null, 2)}
+                        </pre>
+                      </div>
+                    ) : null}
                     {(() => {
                       const profileFiles = artifacts
                         .flatMap((p) => p.files)
