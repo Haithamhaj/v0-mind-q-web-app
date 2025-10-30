@@ -23,10 +23,10 @@ export const EChartBase: React.FC<EChartBaseProps> = ({ option, height = 320, cl
 
     let instance = echarts.getInstanceByDom(target);
     if (!instance) {
-      instance = echarts.init(target, undefined, { renderer: "svg" });
+      instance = echarts.init(target, undefined, { renderer: "canvas" });
     }
 
-    instance.setOption(option, true);
+    instance.setOption(option, { notMerge: false, lazyUpdate: true });
     onReady?.(instance);
 
     const resize = () => {

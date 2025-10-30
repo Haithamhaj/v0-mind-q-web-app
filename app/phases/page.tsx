@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, Loader2, Play, Plus, Sparkles, X } from "lucide-react"
 import { api, type BiPhaseResponse, type PhaseRequest } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
-import { BiChart } from "@/components/bi-chart"
+import { VisualizationAdapter } from "@/components/VisualizationAdapter"
 import { useLanguage } from "@/context/language-context"
 
 const phases = [
@@ -644,11 +644,13 @@ export default function PhasesPage(): React.JSX.Element {
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                           </div>
-                          <BiChart
+                          <VisualizationAdapter
                             data={biChartData ?? []}
-                            chartType={biChartMeta?.chartType ?? "bar"}
-                            xKey={biChartMeta?.xKey ?? "dt"}
-                            valueKey={biChartMeta?.valueKey ?? "val"}
+                            viz={{
+                              chartType: biChartMeta?.chartType ?? "bar",
+                              xKey: biChartMeta?.xKey ?? "dt",
+                              valueKey: biChartMeta?.valueKey ?? "val",
+                            }}
                           />
                           {biChartData ? (
                             <div className="max-h-64 overflow-auto rounded-md border border-border">

@@ -1,4 +1,5 @@
 import type { FC } from "react"
+import { useMemo } from "react"
 import type { EChartsCoreOption } from "echarts"
 import { EChartBase } from "@/src/bi/components/layer2/EChartBase"
 
@@ -21,51 +22,64 @@ export const BiChart: FC<BiChartProps> = ({ data, chartType, xKey, valueKey = "v
     )
   }
 
-  const first = data[0] ?? {}
-  const resolvedXKey = xKey in first ? xKey : Object.keys(first)[0]
-  const resolvedValueKey =
-    valueKey in first
-      ? valueKey
-      : (Object.keys(first).find((k) => typeof (first as any)[k] === "number") ?? valueKey)
+  const option = useMemo<EChartsCoreOption>(() => {
+    const first = data[0] ?? {}
+    const resolvedXKey = xKey in first ? xKey : Object.keys(first)[0]
+    const resolvedValueKey =
+      valueKey in first
+        ? valueKey
+        : (Object.keys(first).find((k) => typeof (first as any)[k] === "number") ?? valueKey)
 
-  const commonAxes: EChartsCoreOption = {
-    tooltip: { trigger: chartType === "pie" ? "item" : "axis" },
-    grid: { top: 24, right: 16, bottom: 40, left: 40 },
-    xAxis: chartType === "pie" ? undefined : { type: "category", data: data.map((d) => String((d as any)[resolvedXKey])) },
-    yAxis: chartType === "pie" ? undefined : { type: "value" },
-    legend: chartType === "pie" ? { top: 0 } : undefined,
-  }
-
-  let option: EChartsCoreOption
-  if (chartType === "pie") {
-    option = {
-      ...commonAxes,
-      series: [
-        {
-          type: "pie",
-          radius: ["40%", "70%"],
-          avoidLabelOverlap: true,
-          data: data.map((d) => ({
-            name: String((d as any)[resolvedXKey]),
-            value: Number((d as any)[resolvedValueKey] ?? 0),
-          })),
-        },
-      ],
+    const base: EChartsCoreOption = {
+      color: DEFAULT_COLORS,
+      animation: true,
+      animationDuration: 300,
+      dataset: [{ source: data }],
+      tooltip: {
+        trigger: chartType === "pie" ? "item" : "axis",
+        confine: true,
+        axisPointer: chartType === "pie" ? undefined : { type: "cross" },
+      },
+      toolbox: { feature: { saveAsImage: {}, dataZoom: {}, restore: {} } },
+      dataZoom: chartType === "pie" ? undefined : [{ type: "inside" }, { type: "slider" }],
+      brush: chartType === "pie" ? undefined : { toolbox: ["rect", "polygon", "keep", "clear"], xAxisIndex: "all" },
+      grid: { top: 32, right: 24, bottom: 56, left: 56, containLabel: true },
+      xAxis: chartType === "pie" ? undefined : { type: resolvedXKey === "dt" ? "category" : "category" },
+      yAxis: chartType === "pie" ? undefined : { type: "value", splitLine: { show: true } },
+      legend: chartType === "pie" ? { top: 0 } : undefined,
     }
-  } else {
+
+    if (chartType === "pie") {
+      return {
+        ...base,
+        series: [
+          {
+            type: "pie",
+            radius: ["40%", "70%"],
+            avoidLabelOverlap: true,
+            encode: { itemName: resolvedXKey, value: resolvedValueKey },
+          } as any,
+        ],
+      }
+    }
+
     const seriesType = chartType === "area" ? "line" : chartType === "pareto" ? "bar" : chartType
-    option = {
-      ...commonAxes,
+    return {
+      ...base,
       series: [
         {
           type: seriesType as any,
           smooth: seriesType === "line",
           areaStyle: chartType === "area" ? {} : undefined,
-          data: data.map((d) => Number((d as any)[resolvedValueKey] ?? 0)),
-        },
+          encode: { x: resolvedXKey, y: resolvedValueKey },
+          sampling: "lttb",
+          progressive: 8000,
+          large: seriesType === "bar",
+          largeThreshold: 2000,
+        } as any,
       ],
     }
-  }
+  }, [data, chartType, xKey, valueKey])
 
   return <EChartBase option={option} height={height} />
 }

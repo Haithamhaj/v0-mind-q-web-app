@@ -28,3 +28,21 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Visualization architecture
+
+- ECharts is used as the primary charting engine via `src/bi/components/layer2/EChartBase` and `components/bi-chart`.
+- A new `components/VisualizationAdapter` routes to advanced charts (heatmap, boxplot, waterfall, scatter, multi-axis) under `src/bi/components/layer2`.
+- Performance defaults: canvas renderer, lazy updates, dataset/encode, progressive rendering, dataZoom/brush/toolbox.
+
+### Usage
+
+```tsx
+<VisualizationAdapter
+  data={rows}
+  viz={{ chartType: "heatmap", xKey: "dt", valueKey: "val" }}
+  height={360}
+/>
+```
+
+Supported chartType examples: `bar`, `line`, `area`, `pie`, `heatmap`, `boxplot`, `scatter`, `waterfall`, `multi-line`.
