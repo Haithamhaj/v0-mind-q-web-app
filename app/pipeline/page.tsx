@@ -57,6 +57,18 @@ export default function PipelinePage() {
   const [isUploadingSlaFiles, setIsUploadingSlaFiles] = useState(false)
   const { toast } = useToast()
 
+  // LLM Advisor state
+  const [advisorLoading, setAdvisorLoading] = useState(false)
+  const [advisorSummary, setAdvisorSummary] = useState<string>("")
+  const [advisorRecommendedConfig, setAdvisorRecommendedConfig] = useState<Record<string, unknown> | null>(null)
+  const [advisorAutoDecide, setAdvisorAutoDecide] = useState<boolean>(false)
+  // Editable advisor fields
+  const [advTargetColumn, setAdvTargetColumn] = useState<string>("")
+  const [advClusteringK, setAdvClusteringK] = useState<string>("")
+  const [advAssocSupport, setAdvAssocSupport] = useState<string>("")
+  const [advAssocConfidence, setAdvAssocConfidence] = useState<string>("")
+  const [advRecTopK, setAdvRecTopK] = useState<string>("")
+
   const phaseStatusLabels = useMemo<Record<PipelinePhaseStatus, string>>(
     () => ({
       pending: translate("Pending"),
@@ -323,7 +335,24 @@ export default function PipelinePage() {
         description: translate("Starting KNIME Bridge for {runId}...", { runId }),
       })
 
-      await api.runKnimeBridge(runId, { use_defaults: true, config: { run_batch: true } })
+      const mergedConfig: Record<string, unknown> = { run_batch: true }
+      // include edited advisor fields if present
+      if (advTargetColumn.trim()) mergedConfig["target_column"] = advTargetColumn.trim()
+      const kNum = Number(advClusteringK)
+      if (!Number.isNaN(kNum) && advClusteringK.trim()) mergedConfig["clustering_k"] = kNum
+      const supNum = Number(advAssocSupport)
+      if (!Number.isNaN(supNum) && advAssocSupport.trim()) mergedConfig["assoc_min_support"] = supNum
+      const confNum = Number(advAssocConfidence)
+      if (!Number.isNaN(confNum) && advAssocConfidence.trim()) mergedConfig["assoc_min_confidence"] = confNum
+      const topKNum = Number(advRecTopK)
+      if (!Number.isNaN(topKNum) && advRecTopK.trim()) mergedConfig["rec_top_k"] = topKNum
+      if (advisorAutoDecide) {
+        mergedConfig["auto_execute"] = true
+      }
+      if (advisorRecommendedConfig && Object.keys(advisorRecommendedConfig).length > 0) {
+        Object.assign(mergedConfig, advisorRecommendedConfig)
+      }
+      await api.runKnimeBridge(runId, { use_defaults: true, config: mergedConfig })
 
       toast({
         title: translate("KNIME Bridge completed"),
@@ -592,6 +621,144 @@ export default function PipelinePage() {
                 <CardDescription>{translate("Set up your pipeline run parameters.")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* LLM Advisor */}
+                <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-primary">{translate("Pre-train Advisor (LLM)")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {translate("Get AI-suggested configuration based on your data (e.g., target, clustering_k, thresholds).")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={advisorLoading}
+                      onClick={async () => {
+                        try {
+                          setAdvisorLoading(true)
+                          const res = await api.runLLMSummary(runId, { use_defaults: true })
+                          // Expect fields like summary, recommended_actions, and optional config in response
+                          const summaryText =
+                            typeof (res as any)?.summary === "string"
+                              ? ((res as any).summary as string)
+                              : JSON.stringify(res)
+                          setAdvisorSummary(summaryText)
+                          // Heuristic: if response contains a "recommended_config" object, capture it
+                          const rc = (res as any)?.recommended_config
+                          if (rc && typeof rc === "object") {
+                            setAdvisorRecommendedConfig(rc as Record<string, unknown>)
+                        // hydrate editable fields
+                        setAdvTargetColumn(typeof rc.target_column === "string" ? rc.target_column : "")
+                        setAdvClusteringK(
+                          typeof rc.clustering_k === "number" || typeof rc.clustering_k === "string"
+                            ? String(rc.clustering_k)
+                            : "",
+                        )
+                        setAdvAssocSupport(
+                          typeof rc.assoc_min_support === "number" || typeof rc.assoc_min_support === "string"
+                            ? String(rc.assoc_min_support)
+                            : "",
+                        )
+                        setAdvAssocConfidence(
+                          typeof rc.assoc_min_confidence === "number" || typeof rc.assoc_min_confidence === "string"
+                            ? String(rc.assoc_min_confidence)
+                            : "",
+                        )
+                        setAdvRecTopK(
+                          typeof rc.rec_top_k === "number" || typeof rc.rec_top_k === "string"
+                            ? String(rc.rec_top_k)
+                            : "",
+                        )
+                          } else {
+                            setAdvisorRecommendedConfig(null)
+                        setAdvTargetColumn("")
+                        setAdvClusteringK("")
+                        setAdvAssocSupport("")
+                        setAdvAssocConfidence("")
+                        setAdvRecTopK("")
+                          }
+                          toast({
+                            title: translate("Advisor ready"),
+                            description: translate("LLM summary generated. Review and continue."),
+                          })
+                        } catch (e) {
+                          toast({
+                            title: translate("Advisor failed"),
+                            description: e instanceof Error ? e.message : translate("Unable to run LLM advisor"),
+                            variant: "destructive",
+                          })
+                        } finally {
+                          setAdvisorLoading(false)
+                        }
+                      }}
+                    >
+                      {advisorLoading ? translate("Running…") : translate("Run Advisor")}
+                    </Button>
+                  </div>
+                  {advisorSummary && (
+                    <div className="rounded-md border border-border/40 bg-muted/10 p-3 text-sm text-muted-foreground">
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words">{advisorSummary}</pre>
+                    </div>
+                  )}
+                  {/* Editable Advisor Config */}
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="advTargetColumn">{translate("Target column (optional)")}</Label>
+                      <Input
+                        id="advTargetColumn"
+                        placeholder={translate("e.g., delivered_on_time")}
+                        value={advTargetColumn}
+                        onChange={(e) => setAdvTargetColumn(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="advClusteringK">{translate("Clustering: k")}</Label>
+                      <Input
+                        id="advClusteringK"
+                        placeholder="5"
+                        value={advClusteringK}
+                        onChange={(e) => setAdvClusteringK(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="advAssocSupport">{translate("Association min support")}</Label>
+                      <Input
+                        id="advAssocSupport"
+                        placeholder="0.02"
+                        value={advAssocSupport}
+                        onChange={(e) => setAdvAssocSupport(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="advAssocConfidence">{translate("Association min confidence")}</Label>
+                      <Input
+                        id="advAssocConfidence"
+                        placeholder="0.3"
+                        value={advAssocConfidence}
+                        onChange={(e) => setAdvAssocConfidence(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="advRecTopK">{translate("Recommendations: top K")}</Label>
+                      <Input
+                        id="advRecTopK"
+                        placeholder="10"
+                        value={advRecTopK}
+                        onChange={(e) => setAdvRecTopK(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="advisorAutoDecide">{translate("Let AI auto-decide and continue")}</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {translate("If enabled, KNIME will run with AI-suggested defaults when available.")}
+                      </p>
+                    </div>
+                    <Switch id="advisorAutoDecide" checked={advisorAutoDecide} onCheckedChange={setAdvisorAutoDecide} />
+                  </div>
+                </div>
                 {/* Run ID */}
                 <div className="space-y-2">
                   <Label htmlFor="runId">{translate("Run ID")}</Label>
