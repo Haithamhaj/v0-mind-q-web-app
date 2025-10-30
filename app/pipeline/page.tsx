@@ -323,7 +323,7 @@ export default function PipelinePage() {
         description: translate("Starting KNIME Bridge for {runId}...", { runId }),
       })
 
-      await api.runKnimeBridge(runId, { use_defaults: true })
+      await api.runKnimeBridge(runId, { use_defaults: true, config: { run_batch: true } })
 
       toast({
         title: translate("KNIME Bridge completed"),

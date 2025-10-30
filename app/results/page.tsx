@@ -652,6 +652,82 @@ export default function ResultsPage() {
 
                 <Card>
                   <CardHeader>
+                    <CardTitle>KNIME Results (Stage 07)</CardTitle>
+                    <CardDescription>
+                      Quick access to KNIME Bridge outputs under <code>phase_07_knime/profile/</code>.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(() => {
+                      const profileFiles = artifacts
+                        .flatMap((p) => p.files)
+                        .filter((f) => f.path.toLowerCase().includes("phase_07_knime/profile/"))
+                      if (!selectedRun) {
+                        return (
+                          <div className="text-sm text-muted-foreground">Select a run to view KNIME outputs.</div>
+                        )
+                      }
+                      if (!profileFiles.length) {
+                        return (
+                          <div className="rounded-md border border-dashed border-border/60 p-3 text-sm text-muted-foreground">
+                            No KNIME profile outputs detected yet. Ensure phase 07 ran with KNIME and try again.
+                          </div>
+                        )
+                      }
+                      const important = [
+                        "feature_report.json",
+                        "bridge_summary.json",
+                        "model_metrics.json",
+                        "feature_importance.json",
+                        "predictions.parquet",
+                      ]
+                      const byName = (name: string) => profileFiles.find((f) => f.name === name)
+                      const items = important
+                        .map((name) => byName(name))
+                        .filter((x): x is NonNullable<typeof x> => Boolean(x))
+                      return (
+                        <div className="space-y-2">
+                          {items.map((file) => (
+                            <div
+                              key={file.path}
+                              className="flex items-center justify-between gap-3 rounded-md border border-border/40 bg-muted/10 px-3 py-2"
+                            >
+                              <div className="flex items-center gap-3">
+                                {getFileIcon(("." + (file.name.split(".").pop() ?? "")).toLowerCase())}
+                                <div>
+                                  <p className="text-sm font-medium text-foreground">{file.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatBytes(file.size)} | {formatDateTime(file.updated_at)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewArtifact(file.path)}
+                                  disabled={isPreviewLoading || file.name.endsWith(".parquet")}
+                                  title={file.name.endsWith(".parquet") ? "Preview not supported; use Download" : "View"}
+                                >
+                                  View
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => handleDownloadArtifact(file.path)}>
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <div className="pt-1 text-xs text-muted-foreground">
+                            JSON files support inline preview below. Parquet needs download to inspect.
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
                     <CardTitle>Artifact Viewer</CardTitle>
                     <CardDescription>
                       Inline preview for JSON, JSONL, CSV, YAML, and text artifacts.

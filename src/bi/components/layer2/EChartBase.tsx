@@ -70,6 +70,7 @@ export const EChartBase: React.FC<EChartBaseProps> = ({ option, height = 320, cl
     }
 
     instance.setOption(option, { notMerge: false, lazyUpdate: true });
+
     onReady?.(instance);
 
     const resize = () => {
