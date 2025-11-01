@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 
-import { api, type PipelineRunInfo } from "@/lib/api";
+import { api, type PipelineRunInfo, type SchemaTerminologyRecord } from "@/lib/api";
 
 import {
   fallbackCorrelations,
@@ -179,6 +179,33 @@ const normaliseAgentFilters = (filters: Record<string, unknown> | undefined): Re
   return normalised;
 };
 
+const invertAliasesMap = (aliases: Record<string, unknown> | undefined | null): Record<string, string[]> => {
+  if (!aliases || typeof aliases !== "object") {
+    return {};
+  }
+  const map: Record<string, string[]> = {};
+  for (const [aliasRaw, columnRaw] of Object.entries(aliases)) {
+    if (typeof columnRaw !== "string") {
+      continue;
+    }
+    const alias = aliasRaw.trim();
+    const column = columnRaw.trim();
+    if (!alias || !column) {
+      continue;
+    }
+    if (!map[column]) {
+      map[column] = [];
+    }
+    if (!map[column].includes(alias)) {
+      map[column].push(alias);
+    }
+  }
+  for (const key of Object.keys(map)) {
+    map[key] = map[key].sort((a, b) => a.localeCompare(b));
+  }
+  return map;
+};
+
 const buildDefaultEndpoints = (run: string, artifactsRoot?: string): Required<EndpointOverrides> => {
   const ar = artifactsRoot && artifactsRoot.trim() ? `&artifacts_root=${encodeURIComponent(artifactsRoot)}` : "";
   const runParam = run && run.trim() ? `run=${encodeURIComponent(run)}` : "";
@@ -351,6 +378,10 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
   const [filters, setFilters] = useState<Record<string, string[]>>({});
   const [catalogMeta, setCatalogMeta] = useState<CatalogMetadata>({});
   const [insightStats, setInsightStats] = useState<InsightStats | undefined>(undefined);
+  const [schemaGlossaryRecords, setSchemaGlossaryRecords] = useState<SchemaTerminologyRecord[]>([]);
+  const [schemaGlossaryAliases, setSchemaGlossaryAliases] = useState<Record<string, string[]>>({});
+  const [schemaGlossaryLoading, setSchemaGlossaryLoading] = useState<boolean>(false);
+  const [schemaGlossaryError, setSchemaGlossaryError] = useState<string | undefined>(undefined);
 
   const refreshRuns = useCallback(async () => {
     setRunsLoading(true);
@@ -399,9 +430,44 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     setFilters({});
   }, [currentRun]);
 
+  useEffect(() => {
+    void fetchSchemaGlossary(currentRun, serverArtifactsRoot);
+  }, [fetchSchemaGlossary, currentRun, serverArtifactsRoot]);
+
+  const refreshSchemaGlossary = useCallback(async () => {
+    await fetchSchemaGlossary(currentRun, serverArtifactsRoot);
+  }, [fetchSchemaGlossary, currentRun, serverArtifactsRoot]);
+
   const handleRunChange = useCallback((runId: string) => {
     setCurrentRun(runId && runId.trim() ? runId : DEFAULT_RUN);
   }, []);
+
+  const fetchSchemaGlossary = useCallback(
+    async (runId: string, artifactsRoot?: string) => {
+      if (!runId || !runId.trim()) {
+        setSchemaGlossaryRecords([]);
+        setSchemaGlossaryAliases({});
+        setSchemaGlossaryError(undefined);
+        setSchemaGlossaryLoading(false);
+        return;
+      }
+      setSchemaGlossaryLoading(true);
+      setSchemaGlossaryError(undefined);
+      try {
+        const response = await api.getSchemaTerminology(runId, artifactsRoot);
+        setSchemaGlossaryRecords(response.records ?? []);
+        setSchemaGlossaryAliases(invertAliasesMap(response.aliases ?? {}));
+      } catch (error) {
+        console.warn("[story-bi] failed to load schema glossary", error);
+        setSchemaGlossaryError(error instanceof Error ? error.message : String(error));
+        setSchemaGlossaryRecords([]);
+        setSchemaGlossaryAliases({});
+      } finally {
+        setSchemaGlossaryLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -601,6 +667,13 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       filters,
       insightStats,
       catalogMeta,
+      schemaGlossary: {
+        records: schemaGlossaryRecords,
+        aliases: schemaGlossaryAliases,
+        loading: schemaGlossaryLoading,
+        error: schemaGlossaryError,
+      },
+      refreshSchemaGlossary,
       setFilter: (dimension: string, values: string[]) => {
         const nextValues = values.filter(Boolean);
         setFilters((prev) => {
@@ -634,12 +707,17 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
       knimeReport,
       loading,
       error,
-      filters,
-      insightStats,
-      catalogMeta,
-      runLayer2Assistant,
-    ],
-  );
+       filters,
+       insightStats,
+       catalogMeta,
+       schemaGlossaryRecords,
+       schemaGlossaryAliases,
+       schemaGlossaryLoading,
+       schemaGlossaryError,
+       refreshSchemaGlossary,
+       runLayer2Assistant,
+     ],
+   );
 
   return <BiDataContext.Provider value={value}>{children}</BiDataContext.Provider>;
 };
@@ -651,6 +729,3 @@ export const useBiDataContext = (): BiDataContextValue => {
   }
   return context;
 };
-
-
-

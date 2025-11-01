@@ -11,14 +11,17 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useLanguage } from "@/context/language-context"
 import type { Language } from "@/context/language-context"
+import SchemaGlossaryCard from "@/components/schema-glossary"
 import {
   api,
   type RunTimeline,
   type RunTimelinePhase,
   type RunTimelinePhaseDefinition,
   type RunTimelineSummary,
+  type SchemaTerminologyRecord,
 } from "@/lib/api"
 
 type PageProps = {
@@ -428,6 +431,10 @@ export default function RunAnalysisPage({ params }: PageProps) {
   const [timeline, setTimeline] = useState<RunTimeline | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [terminologyRecords, setTerminologyRecords] = useState<SchemaTerminologyRecord[]>([])
+  const [terminologyAliases, setTerminologyAliases] = useState<Record<string, string>>({})
+  const [terminologyLoading, setTerminologyLoading] = useState<boolean>(true)
+  const [terminologyError, setTerminologyError] = useState<string | null>(null)
 
   const loadTimeline = useCallback(async () => {
     setLoading(true)
@@ -443,9 +450,60 @@ export default function RunAnalysisPage({ params }: PageProps) {
     }
   }, [runId, artifactsRoot])
 
+  const loadTerminology = useCallback(async () => {
+    setTerminologyLoading(true)
+    setTerminologyError(null)
+    try {
+      const response = await api.getSchemaTerminology(runId, artifactsRoot)
+      setTerminologyRecords(response.records ?? [])
+      setTerminologyAliases(response.aliases ?? {})
+    } catch (err) {
+      setTerminologyError(err instanceof Error ? err.message : "Unable to load schema glossary.")
+      setTerminologyRecords([])
+      setTerminologyAliases({})
+    } finally {
+      setTerminologyLoading(false)
+    }
+  }, [runId, artifactsRoot])
+
   useEffect(() => {
     void loadTimeline()
   }, [loadTimeline])
+
+  useEffect(() => {
+    void loadTerminology()
+  }, [loadTerminology])
+
+  const aliasesByColumn = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const [aliasRaw, columnIdRaw] of Object.entries(terminologyAliases ?? {})) {
+      if (!columnIdRaw) {
+        continue
+      }
+      const alias = String(aliasRaw).trim()
+      const columnId = String(columnIdRaw).trim()
+      if (!alias || !columnId) {
+        continue
+      }
+      if (!map[columnId]) {
+        map[columnId] = []
+      }
+      if (!map[columnId].includes(alias)) {
+        map[columnId].push(alias)
+      }
+    }
+    for (const key of Object.keys(map)) {
+      map[key] = map[key].sort((a, b) => a.localeCompare(b))
+    }
+    return map
+  }, [terminologyAliases])
+
+  const handleRefresh = useCallback(() => {
+    void loadTimeline()
+    void loadTerminology()
+  }, [loadTimeline, loadTerminology])
+
+  const isRefreshing = loading || terminologyLoading
 
   return (
     <div className="flex h-screen">
@@ -473,8 +531,8 @@ export default function RunAnalysisPage({ params }: PageProps) {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={() => loadTimeline()} disabled={loading}>
-                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+                  {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
                   {language === "ar" ? "تحديث" : "Refresh"}
                 </Button>
                 <Link
@@ -486,28 +544,54 @@ export default function RunAnalysisPage({ params }: PageProps) {
               </div>
             </div>
 
-            {error ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-destructive">
-                <p className="font-semibold">
-                  {language === "ar" ? "فشل تحميل المخطط الزمني للتشغيل." : "Failed to load run timeline."}
-                </p>
-                <p className="text-sm">{error}</p>
-              </div>
-            ) : null}
-
-            {loading ? (
-              <div className="flex items-center justify-center py-20 text-muted-foreground">
-                <Loader2 className="mr-3 h-5 w-5 animate-spin" />
-                {language === "ar" ? "جاري تحميل تفاصيل التشغيل..." : "Loading run details..."}
-              </div>
-            ) : timeline ? (
-              <div className="space-y-6">
-                <SummaryCard summary={timeline.summary} language={language} />
-                {timeline.phases.map((phase) => (
-                  <PhaseCard key={phase.id} phase={phase} language={language} />
-                ))}
-              </div>
-            ) : null}
+            <Tabs defaultValue="timeline" className="space-y-6">
+              <TabsList className="w-full justify-start gap-2 md:w-auto">
+                <TabsTrigger value="timeline" className="flex-1 md:flex-none">
+                  {language === "ar" ? "المخطط الزمني للمراحل" : "Phase Timeline"}
+                </TabsTrigger>
+                <TabsTrigger value="glossary" className="flex-1 md:flex-none">
+                  {language === "ar" ? "مسرد المخطط" : "Schema Glossary"}
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="timeline" className="space-y-6">
+                {loading ? (
+                  <div className="flex items-center justify-center py-20 text-muted-foreground">
+                    <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                    {language === "ar" ? "جاري تحميل تفاصيل التشغيل..." : "Loading run details..."}
+                  </div>
+                ) : error ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-destructive">
+                    <p className="font-semibold">
+                      {language === "ar" ? "فشل تحميل المخطط الزمني للتشغيل." : "Failed to load run timeline."}
+                    </p>
+                    <p className="text-sm">{error}</p>
+                  </div>
+                ) : timeline ? (
+                  <div className="space-y-6">
+                    <SummaryCard summary={timeline.summary} language={language} />
+                    {timeline.phases.map((phase) => (
+                      <PhaseCard key={phase.id} phase={phase} language={language} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-border/60 bg-muted/20 p-6 text-sm text-muted-foreground">
+                    {language === "ar"
+                      ? "لا تتوفر بيانات المخطط الزمني لهذا التشغيل."
+                      : "No timeline data is available for this run."}
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent value="glossary">
+                <SchemaGlossaryCard
+                  records={terminologyRecords}
+                  aliasesByColumn={aliasesByColumn}
+                  language={language}
+                  loading={terminologyLoading}
+                  error={terminologyError}
+                  resetKey={`${runId}-${artifactsRoot ?? ""}`}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>

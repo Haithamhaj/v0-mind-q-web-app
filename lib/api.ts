@@ -177,6 +177,31 @@ export interface RunTimeline {
   phases: RunTimelinePhase[]
 }
 
+export interface SchemaTerminologyRecord {
+  column_id: string
+  original_name?: string | null
+  display_en?: string | null
+  display_ar?: string | null
+  description_en?: string | null
+  description_ar?: string | null
+  synonyms_en?: string[] | null
+  synonyms_ar?: string[] | null
+  tags?: string[] | null
+  is_kpi?: boolean | null
+  kpi_links?: string[] | null
+  value_examples?: Array<string | number> | null
+  dtype?: string | null
+  null_fraction?: number | null
+  unique_count?: number | null
+}
+
+export interface SchemaTerminologyResponse {
+  run_id: string
+  artifacts_root: string
+  records: SchemaTerminologyRecord[]
+  aliases: Record<string, string>
+}
+
 export interface ArtifactContentResponse {
   run_id: string
   path: string
@@ -696,6 +721,18 @@ class MindQAPI {
   async getRunTimeline(runId: string, artifactsRoot?: string): Promise<RunTimeline> {
     const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
     return this.get(`/v1/runs/${runId}/timeline${query}`)
+  }
+
+  async getSchemaTerminology(
+    runId: string,
+    artifactsRoot?: string,
+    format: "json" | "flat" = "flat",
+  ): Promise<SchemaTerminologyResponse> {
+    const params = new URLSearchParams({ format })
+    if (artifactsRoot) {
+      params.set("artifacts_root", artifactsRoot)
+    }
+    return this.get(`/v1/runs/${runId}/schema/terminology?${params.toString()}`)
   }
 
   async getPipelineStatus(runId: string, artifactsRoot?: string): Promise<PipelineProgress> {

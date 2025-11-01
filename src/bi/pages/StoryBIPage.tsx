@@ -4,6 +4,7 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'rea
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HelpTrigger } from '@/components/help/help-trigger';
+import SchemaGlossaryCard from '@/components/schema-glossary';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ import {
   useBiInsights,
   useBiMetrics,
   useBiCorrelations,
+  useBiSchemaGlossary,
 } from '../data';
 import type {
   CorrelationCollection,
@@ -747,6 +749,7 @@ const StoryBIContent: React.FC = () => {
   } = useBiData();
   const { insights, insightStats } = useBiInsights();
   const correlations = useBiCorrelations();
+  const schemaGlossary = useBiSchemaGlossary();
   const locale = language === 'ar' ? 'ar-SA' : 'en-US';
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }),
@@ -1777,6 +1780,37 @@ const StoryBIContent: React.FC = () => {
           </ul>
         </BiSection>
       ) : null}
+
+      <BiSection
+        id="schema-glossary"
+        subtitle={translate("المرحلة 03")}
+        title={translate("مسرد الأعمدة والدلالات")}
+        description={translate("مرجع تعليمي يوضح الأسماء والوصف والمرادفات التي تولدها المرحلة الثالثة عند كل تشغيل.")}
+        actions={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+            disabled={schemaGlossary.loading}
+            onClick={() => {
+              void schemaGlossary.refresh();
+            }}
+          >
+            {schemaGlossary.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            {translate("تحديث المسرد")}
+          </Button>
+        }
+      >
+        <SchemaGlossaryCard
+          records={schemaGlossary.records}
+          aliasesByColumn={schemaGlossary.aliases}
+          language={language}
+          loading={schemaGlossary.loading}
+          error={schemaGlossary.error ?? null}
+          resetKey={runId}
+        />
+      </BiSection>
 
       {rawMetricsLoading ? (
         <BiSection

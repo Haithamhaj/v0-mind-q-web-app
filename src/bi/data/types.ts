@@ -1,4 +1,4 @@
-import type { PipelineRunInfo } from "@/lib/api";
+import type { PipelineRunInfo, SchemaTerminologyRecord } from "@/lib/api";
 import type { Layer3Intelligence } from "./intelligence";
 
 export type MetricSpec = {
@@ -405,5 +405,12 @@ export type BiDataContextValue = {
   insightStats?: InsightStats;
   catalogMeta: CatalogMetadata;
   runLayer2Assistant: (request: Layer2AgentRequest) => Promise<Layer2AgentResult>;
+  schemaGlossary: {
+    records: SchemaTerminologyRecord[];
+    aliases: Record<string, string[]>;
+    loading: boolean;
+    error?: string;
+  };
+  refreshSchemaGlossary: () => Promise<void>;
 };
 

@@ -65,3 +65,11 @@ export const useFilteredDataset = () => {
   }, [dataset, filters]);
 };
 
+export const useBiSchemaGlossary = () => {
+  const { schemaGlossary, refreshSchemaGlossary } = useBiDataContext();
+  return {
+    ...schemaGlossary,
+    refresh: refreshSchemaGlossary,
+  };
+};
+
