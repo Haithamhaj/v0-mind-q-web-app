@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as echarts from "echarts"
 import { Loader2, Download, Search, FileJson, FileSpreadsheet, FileCode, CheckCircle2 } from "lucide-react"
@@ -395,6 +396,13 @@ export default function ResultsPage() {
 
   const hasRuns = runs.length > 0
   const selectedRunInfo = runs.find((run) => run.run_id === selectedRun) ?? null
+  const analysisHref = useMemo(() => {
+    if (!selectedRun) {
+      return "#"
+    }
+    const base = `/runs/${selectedRun}/analysis`
+    return artifactsRoot ? `${base}?artifacts_root=${encodeURIComponent(artifactsRoot)}` : base
+  }, [selectedRun, artifactsRoot])
   const metricSql =
     selectedMetric && typeof selectedMetric["sql"] === "string"
       ? (selectedMetric["sql"] as string)
@@ -497,6 +505,11 @@ export default function ResultsPage() {
                     ) : (
                       "Refresh"
                     )}
+                  </Button>
+                  <Button asChild variant="outline" size="sm" disabled={!selectedRun}>
+                    <Link href={analysisHref} aria-disabled={!selectedRun}>
+                      Run Analysis
+                    </Link>
                   </Button>
                 </div>
               </CardHeader>

@@ -138,6 +138,45 @@ export interface RunArtifactsResponse {
   phases: ArtifactPhaseInfo[]
 }
 
+export interface RunTimelinePhaseDefinition {
+  id: string
+  name: Record<string, string>
+  description: Record<string, string>
+  expected_inputs: Array<{
+    id: string
+    name: Record<string, string>
+    description: Record<string, string>
+  }>
+  expected_outputs: string[]
+  key_checks: string[]
+  common_failures: string[]
+  learning_resources: Array<{ title: string; url?: string | null }>
+}
+
+export interface RunTimelinePhase {
+  id: string
+  stage_directory: string
+  definition: RunTimelinePhaseDefinition
+  meta?: Record<string, unknown> | null
+  events: Array<Record<string, unknown>>
+}
+
+export interface RunTimelineSummary {
+  status_counts: Record<string, number>
+  phases_with_errors: string[]
+  phases_with_warnings: string[]
+  started_at?: string
+  finished_at?: string
+  duration_seconds?: number
+}
+
+export interface RunTimeline {
+  run_id: string
+  artifacts_root: string
+  summary: RunTimelineSummary
+  phases: RunTimelinePhase[]
+}
+
 export interface ArtifactContentResponse {
   run_id: string
   path: string
@@ -652,6 +691,11 @@ class MindQAPI {
   async listRunArtifacts(runId: string, artifactsRoot?: string): Promise<RunArtifactsResponse> {
     const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
     return this.get(`/v1/runs/${runId}/artifacts${query}`)
+  }
+
+  async getRunTimeline(runId: string, artifactsRoot?: string): Promise<RunTimeline> {
+    const query = artifactsRoot ? `?artifacts_root=${encodeURIComponent(artifactsRoot)}` : ""
+    return this.get(`/v1/runs/${runId}/timeline${query}`)
   }
 
   async getPipelineStatus(runId: string, artifactsRoot?: string): Promise<PipelineProgress> {
