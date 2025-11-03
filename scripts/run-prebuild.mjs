@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const shouldSkip = (() => {
+const shouldSkip = (() => {`n  // Auto-skip on Vercel`n  if (process.env.VERCEL) return true;
   const value = process.env.SKIP_FRONTEND_PREBUILD;
   if (!value) return false;
   const normalized = value.toLowerCase();
