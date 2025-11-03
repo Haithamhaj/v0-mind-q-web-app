@@ -430,18 +430,6 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     setFilters({});
   }, [currentRun]);
 
-  useEffect(() => {
-    void fetchSchemaGlossary(currentRun, serverArtifactsRoot);
-  }, [fetchSchemaGlossary, currentRun, serverArtifactsRoot]);
-
-  const refreshSchemaGlossary = useCallback(async () => {
-    await fetchSchemaGlossary(currentRun, serverArtifactsRoot);
-  }, [fetchSchemaGlossary, currentRun, serverArtifactsRoot]);
-
-  const handleRunChange = useCallback((runId: string) => {
-    setCurrentRun(runId && runId.trim() ? runId : DEFAULT_RUN);
-  }, []);
-
   const fetchSchemaGlossary = useCallback(
     async (runId: string, artifactsRoot?: string) => {
       if (!runId || !runId.trim()) {
@@ -468,6 +456,18 @@ export const BiDataProvider: React.FC<BiDataProviderProps> = ({ children, endpoi
     },
     [],
   );
+
+  useEffect(() => {
+    void fetchSchemaGlossary(currentRun, serverArtifactsRoot);
+  }, [fetchSchemaGlossary, currentRun, serverArtifactsRoot]);
+
+  const refreshSchemaGlossary = useCallback(async () => {
+    await fetchSchemaGlossary(currentRun, serverArtifactsRoot);
+  }, [fetchSchemaGlossary, currentRun, serverArtifactsRoot]);
+
+  const handleRunChange = useCallback((runId: string) => {
+    setCurrentRun(runId && runId.trim() ? runId : DEFAULT_RUN);
+  }, []);
 
   useEffect(() => {
     let active = true;
